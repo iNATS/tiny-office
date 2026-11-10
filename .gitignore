@@ -1,0 +1,17 @@
+# secrets + runtime data (never commit)
+.env
+settings.json
+data.json
+team.json
+projects/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# demo-video tooling (node_modules, renders, captures)
+video/
+
+# os
+.DS_Store

@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tiny Office</title>
+<style>
+:root{--bg:#eef3fb;--ink:#2d3047;--muted:#7a8199;--card:#fff;--line:#dbe3f0;--accent:#ff7a59;--ok:#3fbf7f;--bad:#e5645a}
+*{box-sizing:border-box}body{margin:0;font:14px/1.4 ui-rounded,"SF Pro Rounded","Nunito",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+h1{margin:0;font-size:20px;font-weight:800}.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:var(--card);border:2px solid var(--line);border-radius:10px;padding:4px 10px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer}
+.pill.nav{color:var(--ink);border-color:var(--ink);box-shadow:0 2px 0 var(--ink)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--bad);margin-right:5px}.dot.on{background:var(--ok)}
+.wrap{padding:0 20px 20px}
+#stage{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;border:4px solid #2d3047;background:#bfe0ff;box-shadow:0 6px 0 #2d3047;touch-action:none}
+#stage canvas{display:block;width:100%;height:100%}
+#ui{position:absolute;inset:0;pointer-events:none}
+.bubble,.name,.room,.zz{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font-weight:800}
+.bubble{background:#fff;border:3px solid var(--ink);border-radius:10px;padding:3px 9px;font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 3px 0 var(--ink)}
+.bubble:empty,.zz:empty{display:none}
+.name{font-size:11px;color:#fff;background:#2d3047cc;border-radius:6px;padding:1px 7px;transform:translate(-50%,0)}
+.room{font-size:12px;color:#2d3047;background:#ffffffd9;border:2px solid var(--ink);border-radius:8px;padding:1px 8px}
+.room.go{pointer-events:auto;cursor:pointer;background:#fff;box-shadow:0 2px 0 var(--ink)}
+.zz{font-size:16px;color:#fff;text-shadow:0 2px 0 #2d3047;animation:float 2s infinite}
+@keyframes float{from{margin-top:0;opacity:1}to{margin-top:-14px;opacity:0}}
+.ctl{position:absolute;right:10px;bottom:10px;display:flex;gap:6px}
+.ctl button{width:34px;height:34px;padding:0;background:#fff;color:var(--ink);border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink);font-size:16px}
+.emo{font-size:52px;line-height:1;background:var(--card);border:3px solid var(--ink);border-radius:14px;padding:8px;box-shadow:0 4px 0 var(--ink)}
+/* ---------- drawer ---------- */
+#shade{position:fixed;inset:0;background:#3b2f2a55;opacity:0;pointer-events:none;transition:.2s;z-index:9998}
+#drawer{position:fixed;top:0;right:0;height:100%;width:min(460px,100%);background:var(--bg);border-left:3px solid var(--line);transform:translateX(100%);transition:.25s;z-index:9999;overflow:auto;padding:16px}
+.open #shade{opacity:1;pointer-events:auto}.open #drawer{transform:none}
+.dhead{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.dhead h2{margin:0;font-size:18px}.x{margin-left:auto;align-self:flex-start;background:none;color:var(--muted);font-size:20px;padding:0 6px}
+.card{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.card h3{margin:0 0 8px;font-size:14px}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+select,textarea,input{font:inherit;border-radius:10px;border:2px solid var(--line);padding:7px 9px;background:#fff;color:var(--ink);width:100%}
+textarea{resize:vertical;min-height:60px}
+button{font:inherit;background:var(--accent);color:#fff;border:none;font-weight:700;cursor:pointer;border-radius:10px;padding:7px 12px}
+button.ghost{background:transparent;color:var(--muted);border:2px solid var(--line)}
+.row{display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}.tabs button{background:var(--card);color:var(--muted);border:2px solid var(--line)}.tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.t{border:1px solid var(--line);border-radius:12px;padding:8px;background:#fff;margin-bottom:8px}
+.t .top{display:flex;justify-content:space-between;gap:6px;font-size:12px}.t .ttl{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st{font-size:11px;padding:1px 7px;border-radius:99px;flex:none;background:#eee}
+.st.working,.st.waiting{background:#d6f0ff}.st.review{background:#ffe7b3}.st.done{background:#d3f5dc}.st.error,.st.rejected{background:#ffd3d3}.st.coffee{background:#f0dcc8}
+.out{white-space:pre-wrap;font-size:12px;color:#5a4d46;margin-top:6px;max-height:160px;overflow:auto}
+.muted{color:var(--muted);font-size:12px}.msg{font-size:12px}
+.stat{display:grid;grid-template-columns:1fr auto auto;gap:4px 10px;font-size:13px;align-items:center}
+code{background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 5px;font-size:12px;word-break:break-all}
+.chip{display:inline-block;font-size:11px;background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:1px 8px;margin:4px 4px 0 0;color:var(--muted);font-weight:700}
+/* ---------- chat ---------- */
+.chat{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;margin-bottom:8px}
+.cm{max-width:90%;padding:7px 10px;border-radius:12px;border:2px solid var(--line);background:#fff;font-size:13px;white-space:pre-wrap}
+.cm.me{align-self:flex-end;background:#ffe9e2;border-color:#ffc9b8}.cm .md{white-space:normal}
+/* ---------- modal (board / archive) ---------- */
+#modal{position:fixed;inset:0;background:#3b2f2a55;display:none;z-index:10000;padding:3vh 3vw}
+#modal.on{display:block}
+.mbox{background:var(--bg);border:4px solid var(--ink);border-radius:18px;box-shadow:0 6px 0 var(--ink);height:100%;display:flex;flex-direction:column;overflow:hidden}
+.mhead{display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:2px solid var(--line);flex-wrap:wrap}.mhead h2{margin:0;font-size:18px;margin-right:auto}
+.mhead select{width:auto}.mhead .tabs{margin:0}
+.mbody{flex:1;overflow:auto;padding:14px 16px}
+.kan{display:grid;grid-template-columns:repeat(5,minmax(210px,1fr));gap:10px;min-width:1080px;align-items:start}
+.col{background:#ffffff80;border:2px solid var(--line);border-radius:14px;padding:8px}.col h4{margin:2px 4px 8px;font-size:13px}
+.kc{background:#fff;border:2px solid var(--line);border-left:6px solid var(--c);border-radius:12px;padding:7px 9px;margin-bottom:7px;font-size:12px}
+.kc summary{cursor:pointer}
+.tl{background:#fff;border:2px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:12px}.tl h4{margin:0 0 6px}
+.tlr{display:grid;grid-template-columns:minmax(120px,240px) 1fr;gap:10px;align-items:center}
+.tll{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lane{position:relative;height:26px;margin:3px 0;background:repeating-linear-gradient(90deg,#eef3fb 0 1px,transparent 1px 10%);border-radius:6px}
+.bar{position:absolute;top:2px;height:22px;border-radius:7px;background:var(--c);color:#fff;font-size:11px;font-weight:700;padding:2px 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;border:2px solid var(--ink);min-width:10px}
+.bar.open{background-image:repeating-linear-gradient(45deg,#ffffff40 0 6px,transparent 6px 12px)}
+.axis{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.arch{display:grid;grid-template-columns:320px 1fr;gap:14px;align-items:start}
+@media(max-width:780px){.arch{grid-template-columns:1fr}#modal{padding:8px}}
+.pf{display:flex;gap:10px;align-items:center;cursor:pointer}.pf.on{border-color:var(--accent);box-shadow:0 3px 0 var(--accent)}
+.md{font-size:13px}.md h3,.md h4,.md h5,.md h6{margin:10px 0 4px}.md p{margin:4px 0}.md li{margin-left:18px}
+.md pre,pre.code{background:var(--ink);color:#fff;padding:10px;border-radius:10px;overflow:auto;font-size:12px;white-space:pre}
+.md table{border-collapse:collapse;font-size:12px;margin:6px 0}.md td{border:1px solid var(--line);padding:3px 7px}
+.files div{font-size:12px;padding:3px 6px;border-radius:6px;cursor:pointer}.files div:hover{background:var(--bg)}
+.bubble.say{background:#fffbe6;border-color:var(--accent);box-shadow:0 3px 0 var(--accent);max-width:260px;white-space:normal;text-align:center;z-index:2}
+/* ---------- calendar ---------- */
+.prog{height:10px;background:var(--bg);border-radius:99px;overflow:hidden;border:2px solid var(--line);margin-top:5px}.prog i{display:block;height:100%;background:var(--ok)}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-bottom:12px}
+.pgrid .card{margin:0;border-left:6px solid var(--c);cursor:pointer}
+.calw{overflow-x:auto}.cal{display:grid;grid-template-columns:repeat(7,minmax(96px,1fr));gap:6px;min-width:700px}
+.cal .wd{font-size:12px;font-weight:800;color:var(--muted);text-align:center}
+.cd{background:#fff;border:2px solid var(--line);border-radius:12px;min-height:100px;padding:5px 6px;font-size:11px;cursor:pointer;overflow:hidden}
+.cd b{font-size:12px}.cd.out{opacity:.4}.cd.today{border-color:var(--accent);box-shadow:0 3px 0 var(--accent)}.cd.sel{outline:3px solid var(--ink)}
+.pstrip{height:6px;border-radius:3px;margin:3px 0 0;background:var(--c)}
+.tchip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:4px solid var(--c);padding-left:4px;margin-top:3px}
+</style></head><body>
+<header><h1>🧱 Tiny Office <span style="font-weight:600;color:var(--muted);font-size:14px">virtual AI agency</span></h1>
+ <div class="pills"><span class="pill nav" onclick="open_('sara')">🛎️ Talk to Sara</span><span class="pill nav" onclick="open_('max')">📊 Summary</span>
+ <span class="pill nav" onclick="openBoard()">📋 Board</span><span class="pill nav" onclick="openCal()">📅 Calendar</span><span class="pill nav" onclick="openArchive()">🗄️ Archive</span><span class="pill nav" onclick="openManager('office')">➕ Team</span></div>
+ <div class="pills" onclick="openManager('connections')"><span class="pill"><span class="dot" id="hb"></span>AI brain</span><span class="pill"><span class="dot" id="he"></span>Email</span>
+ <span class="pill"><span class="dot" id="hw"></span>WhatsApp</span><span class="pill"><span class="dot" id="hi"></span>Instagram</span><span class="pill" id="rv">📬 0 to review</span></div></header>
+<div class="wrap"><div id="stage"><div id="ui"></div><div class="ctl"><button onclick="zoom(.85)" title="Zoom in">＋</button><button onclick="zoom(1.18)" title="Zoom out">－</button><button onclick="resetView()" title="Reset view">⟲</button></div></div>
+ <div class="muted" style="margin-top:8px">Drag to move around · scroll to zoom · click anyone to talk to them · click the wall board or the archive room</div></div>
+<div id="shade" onclick="closeD()"></div><aside id="drawer"></aside>
+<div id="modal" onclick="if(event.target===this)closeM()"><div class="mbox"><div class="mhead"><h2 id="mt"></h2><div id="mx" class="row" style="margin:0"></div><button class="x" onclick="closeM()">✕</button></div><div class="mbody" id="mb"></div></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+/* ---- the team: one avatar system (c = body, head, belly · t = UI tone · i = item icon) ---- */
+const P={
+ boss:{name:"Boto",role:"Manager · settings",emo:"🤖",i:"⚙️",t:"#9aa7c7",c:["#9aa7c7","#b8c4e0","#dfe6f5"]},
+ sara:{name:"Sara",role:"Secretary · tell me what you need",emo:"🦉",i:"🛎️",t:"#a9744f",c:["#a9744f","#c9956b","#f3dfc6"]},
+ max:{name:"Max",role:"Project Manager",emo:"🦁",i:"📊",t:"#e0a840",c:["#e0a840","#ecbb5c","#fff1d6"]},
+ ollie:{name:"Ollie",role:"Office Boy",emo:"🐹",i:"🧹",t:"#e8a56b",c:["#e8a56b","#f2bb84","#fff3e0"],s:1.3},
+ sam:{name:"Sam",role:"Marketing Strategist",emo:"🦊",i:"📈",t:"#ff8a3d",c:["#ff8a3d","#ff9b52","#fff3e6"],ph:"Plan a 2-week campaign for our winter offers"},
+ mira:{name:"Mira",role:"Email Manager",emo:"🐰",i:"📧",t:"#ff86b0",c:["#ffd1e3","#fff0f6","#fff"],ph:"Write a newsletter about our new summer packages"},
+ wally:{name:"Wally",role:"WhatsApp Support",emo:"🐸",i:"💬",t:"#3fbf7f",c:["#6fd16b","#7fe07a","#d9f7c8"],ph:"Write a WhatsApp broadcast for a weekend discount"},
+ iggy:{name:"Iggy",role:"Instagram Creator",emo:"🐼",i:"📸",t:"#2d3047",c:["#2d3047","#ffffff","#ffffff"],limb:"#2d3047",s:1.4,ph:"Write 3 captions for a beach resort post"},
+ wren:{name:"Wren",role:"Content Writer",emo:"🐤",i:"✍️",t:"#e0a800",c:["#ffd84d","#ffe27a","#fff6c7"],s:1.35,ph:"Write a blog post: 10 hidden gems in Bali"},
+ rex:{name:"Rex",role:"SEO Specialist",emo:"🐶",i:"🔎",t:"#c98b4a",c:["#d9a066","#e6b07a","#fbe9d4"],ph:"Keyword research for 'family holidays Saudi Arabia'"},
+ dex:{name:"Dex",role:"Ads & Analytics",emo:"🦝",i:"📣",t:"#7d808c",c:["#8d8f99","#a3a5ae","#e3e4e8"],ph:"Plan a 5,000 SAR Snapchat + TikTok campaign for Umrah packages"},
+ vito:{name:"Vito",role:"Video Editor",emo:"🐵",i:"🎬",t:"#ff4d6d",c:["#8b5e3c","#9e6d48","#f0d2b0"],ph:"Script + shot list for a 30s Reel about Maldives honeymoon"},
+ gigi:{name:"Gigi",role:"Graphic Designer",emo:"🦄",i:"🎨",t:"#b28cff",c:["#f6e6ff","#ffffff","#ffe0f4"],ph:"Design an SVG logo + color palette for our kids' camp brand"},
+ momo:{name:"Momo",role:"Mobile App Developer",emo:"🐨",i:"📱",t:"#5fa8ff",c:["#a7adb8","#bcc2cc","#eef0f3"],ph:"Build a Flutter app to browse and book holiday packages"},
+ webb:{name:"Webb",role:"Web Developer",emo:"🐧",i:"🌐",t:"#34405e",c:["#34405e","#34405e","#ffffff"],leg:"#ffa62b",ph:"Build a landing page for our summer offers"}};
+const WORK=["sam","mira","wally","iggy","wren","rex","dex","vito","gigi","momo","webb"];
+const TEAM=/*TEAM*/null||{offices:[],agents:[],brains:{},providers:{}};
+for(const a of TEAM.agents){P[a.id]={name:a.name,role:a.role,emo:a.emoji||"🙂",i:a.item||"⭐",t:a.tone||"#5fa8ff",c:a.colors||["#8ad0ff","#a8dcff","#ffffff"],
+ s:+a.scale||1.5,style:a.style,hat:a.hat,hold:a.hold,custom:true,ph:`Give ${a.name} a task…`};WORK.push(a.id)}
+let S={agents:[],tasks:[]},H={},edits={},PROJ=[];
+
+/* ================= 3D WORLD ================= */
+const stage=$("stage"),ui=$("ui"),scene=new THREE.Scene();
+scene.background=new THREE.Color(0xbfe0ff);scene.fog=new THREE.Fog(0xbfe0ff,90,170);
+const cam=new THREE.PerspectiveCamera(34,16/9,.1,300),T=new THREE.Vector3(4,0,1),DIR=new THREE.Vector3(0,1,1).normalize();let dist=58;
+function placeCam(){cam.position.copy(T).addScaledVector(DIR,dist);cam.lookAt(T)}placeCam();
+const R=new THREE.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));
+R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;stage.prepend(R.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x9c8f84,.62));
+const sun=new THREE.DirectionalLight(0xfff4e0,.75);sun.position.set(-10,32,20);sun.target.position.set(4,0,0);scene.add(sun.target);sun.castShadow=true;sun.shadow.mapSize.set(4096,4096);
+Object.assign(sun.shadow.camera,{left:-36,right:36,top:28,bottom:-28});sun.shadow.bias=-.0005;scene.add(sun);
+const MC={};const mat=(c,o)=>o?new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.5},o)):(MC[c]||(MC[c]=new THREE.MeshStandardMaterial({color:c,roughness:.55})));
+function box(w,h,d,c,x,y,z,p=scene,o){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),typeof c==="object"?c:mat(c,o));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;p.add(m);return m}
+function cyl(rt,rb,h,c,x,y,z,p=scene,seg=8){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),typeof c==="object"?c:mat(c));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;p.add(m);return m}
+function cone(r,h,c,x,y,z,p=scene,seg=4){const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,seg),mat(c));m.position.set(x,y,z);m.castShadow=true;p.add(m);return m}
+function tiles(a,b,n){const c=document.createElement("canvas");c.width=c.height=64;const g=c.getContext("2d");g.fillStyle=a;g.fillRect(0,0,64,64);g.fillStyle=b;g.fillRect(0,0,32,32);g.fillRect(32,32,32,32);
+ g.strokeStyle="#0001";g.lineWidth=2;g.strokeRect(0,0,64,64);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(n[0],n[1]);
+ return new THREE.MeshStandardMaterial({map:t,roughness:.7})}
+const pickables=[];const tagPick=(o,id)=>{o.traverse(m=>{if(m.isMesh){m.userData.pick=id;pickables.push(m)}})};
+
+// ===== floor plan: back row (z -14..-2) · corridor (z -2..2) · front row (z 2..14), x -22..30 =====
+//  back : 👔 GM (-22..-12) · 📊 PM (-12..-4) · 💻 Marketing (-4..22) · 🗄️ Archive (22..30)
+//  front: ☕ Lounge (-22..-10) · 🛎️ Front office (-10..0) · 🎨 Creative (0..14) · 👨‍💻 Dev (14..30)
+const RM=[{id:"gm",x0:-22,x1:-12,b:1,door:-14},{id:"pm",x0:-12,x1:-4,b:1,door:-8},{id:"mkt",x0:-4,x1:22,b:1,door:9},{id:"arch",x0:22,x1:30,b:1,door:26},
+ {id:"lounge",x0:-22,x1:-10,b:0,door:-13},{id:"front",x0:-10,x1:0,b:0,door:-5},{id:"cre",x0:0,x1:14,b:0,door:7},{id:"dev",x0:14,x1:30,b:0,door:22}];
+TEAM.offices.forEach((o,i)=>{const x0=30+(i>>1)*14;RM.push({id:o.id,x0,x1:x0+14,b:i%2?0:1,door:x0+7,custom:o})});
+const XMAX=Math.max(30,...RM.map(r=>r.x1)),XC=(XMAX-22)/2,XW=XMAX+22;
+box(XW+12,1,42,"#7cc66b",XC,-.55,1);
+const FLOOR={gm:["#9fb8e8","#b3c8f0"],pm:["#c9b8f0","#d8cbf5"],mkt:["#e9c08f","#ddb27f"],arch:["#d9c7a7","#cbb795"],lounge:["#f4efe6","#e3dccf"],front:["#ffe2d6","#ffd3c2"],cre:["#ffe0f4","#f8d0ea"],dev:["#d7e3f4","#c9d8ee"]};
+for(const r of RM){const w=r.x1-r.x0;box(w,.3,12,tiles(...(FLOOR[r.id]||r.custom.colors.concat(r.custom.colors).slice(0,2)),[w/2,6]),(r.x0+r.x1)/2,0,r.b?-8:8)}
+box(XW,.3,4,tiles("#eef1f6","#e2e7f0",[XW/2,2]),XC,0,0);                                   // corridor
+box(3,.3,6,tiles("#d8d0c4","#cdc4b6",[2,3]),-5,-.02,17);                                // entrance path to the front office
+// walls
+const WALL="#f7f4ee",TRIM="#2d3047",glass=mat("#bfe6ff",{transparent:true,opacity:.35,roughness:.05});
+box(XW+.6,6,.6,WALL,XC,3,-14.3);box(.6,6,28.6,WALL,-22.3,3,0);box(.6,6,28.6,WALL,XMAX+.3,3,0);
+box(XW+.6,.4,.8,TRIM,XC,6.1,-14.3);box(.8,.4,28.6,TRIM,-22.3,6.1,0);box(.8,.4,28.6,TRIM,XMAX+.3,6.1,0);
+for(const x of[-17,1,16]){box(3.4,2.4,.2,mat("#a8dcff",{emissive:0x5fb4ff,emissiveIntensity:.35,roughness:.1}),x,3.6,-13.95);box(3.8,.25,.35,TRIM,x,2.3,-13.9)}
+function wallLine(z,doors,h,m){let x=-22;for(const d of doors){if(d-1.5>x)box(d-1.5-x,h,.3,m,(x+d-1.5)/2,h/2+.15,z);x=d+1.5}box(XMAX-x,h,.3,m,(x+XMAX)/2,h/2+.15,z)}
+wallLine(-2,RM.filter(r=>r.b).map(r=>r.door),2.4,glass);box(XW,.22,.35,TRIM,XC,2.62,-2);  // glass fronts of the back offices
+wallLine(2,RM.filter(r=>!r.b).map(r=>r.door),1.6,WALL);                                 // corridor walls of the front rooms
+for(const x of[-12,-4,22]){box(.3,2.4,12,glass,x,1.35,-8);box(.35,.22,12,TRIM,x,2.62,-8)}  // glass between back offices
+for(const x of[-10,0,14])box(.4,1.6,12,WALL,x,.95,8);                                    // walls between front rooms
+for(const r of RM.filter(r=>r.custom)){if(r.b){box(.3,2.4,12,glass,r.x0,1.35,-8);box(.35,.22,12,TRIM,r.x0,2.62,-8)}else box(.4,1.6,12,WALL,r.x0,.95,8);plant(r.x1-1,r.b?-13.2:13.1,.8)}
+// project board (marketing wall, live counts, click to open)
+const BC=document.createElement("canvas");BC.width=512;BC.height=256;const BT=new THREE.CanvasTexture(BC);let boardKey="";
+function drawBoard(c){const g=BC.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,512,256);g.fillStyle="#2d3047";g.font="bold 36px sans-serif";g.fillText("📋 PROJECT BOARD",20,48);
+ [["📥 To do",c.queued,"#9aa7c7"],["✍️ Working",c.working,"#5fa8ff"],["📬 Review",c.review,"#ffb02e"],["✅ Done",c.done,"#3fbf7f"]].forEach(([l,n,col],i)=>{
+  g.fillStyle="#2d3047";g.font="26px sans-serif";g.fillText(`${l}: ${n}`,24,96+i*38);g.fillStyle=col;g.fillRect(270,74+i*38,Math.min(220,10+n*14),26)});
+ g.fillStyle="#7a8199";g.font="20px sans-serif";g.fillText("click to open ↗",350,246);BT.needsUpdate=true}
+{const b=new THREE.Group();scene.add(b);box(6,3,.15,TRIM,9,3.4,-13.9,b);box(5.6,2.6,.1,new THREE.MeshStandardMaterial({map:BT}),9,3.4,-13.8,b);tagPick(b,"board");drawBoard({queued:0,working:0,review:0,done:0})}
+// wall calendar (project manager's office; dots = days with work; click to open)
+const CC=document.createElement("canvas");CC.width=CC.height=256;const CT=new THREE.CanvasTexture(CC);let calKey="";
+function drawCal(days){const g=CC.getContext("2d"),now=new Date(),y=now.getFullYear(),m=now.getMonth(),first=(new Date(y,m,1).getDay()+6)%7,n=new Date(y,m+1,0).getDate();
+ g.fillStyle="#fff";g.fillRect(0,0,256,256);g.fillStyle="#ff7a59";g.fillRect(0,0,256,46);g.fillStyle="#fff";g.font="bold 24px sans-serif";g.textAlign="center";
+ g.fillText("📅 "+now.toLocaleString("en",{month:"long"}).toUpperCase(),128,32);g.font="bold 13px sans-serif";g.fillStyle="#7a8199";"MTWTFSS".split("").forEach((d,i)=>g.fillText(d,22+i*35,66));
+ for(let d=1;d<=n;d++){const k=first+d-1,cx=22+(k%7)*35,cy=90+(k/7|0)*32;if(d===now.getDate()){g.fillStyle="#ff7a59";g.fillRect(cx-15,cy-17,30,26)}
+  g.fillStyle=d===now.getDate()?"#fff":"#2d3047";g.font="bold 14px sans-serif";g.fillText(d,cx,cy);if(days[d]){g.fillStyle=days[d]>2?"#3fbf7f":"#5fa8ff";g.beginPath();g.arc(cx,cy+7,3.5,0,7);g.fill()}}
+ CT.needsUpdate=true}
+{const b=new THREE.Group();scene.add(b);box(3,3,.15,TRIM,-8,3.6,-13.9,b);box(2.7,2.7,.1,new THREE.MeshStandardMaterial({map:CT}),-8,3.6,-13.8,b);cyl(.1,.1,.1,"#ff7a59",-8,5.2,-13.8,b);tagPick(b,"calendar");drawCal({})}
+// props
+function plant(x,z,s=1){cyl(.45*s,.35*s,.8*s,"#d9774a",x,.55*s,z);box(.9*s,.9*s,.9*s,"#4fb35e",x,1.4*s,z);box(.6*s,.6*s,.6*s,"#6fd17c",x+.2*s,2*s,z-.1*s)}
+plant(-21,-13.2);plant(-5,-13.2,.8);plant(21,-13.2);plant(-21,13.2);plant(-.9,13.1,.8);plant(13,13.1,.8);plant(29.2,13.1);plant(-8.2,15.5,.9);plant(-1.8,15.5,.9);
+box(2.2,3.4,.9,"#a0703f",-14.3,1.85,-13.4);for(let i=0;i<3;i++)for(let j=0;j<4;j++)box(.3,.7,.6,["#ff7a59","#5fa8ff","#ffd36b","#3fbf7f"][(i+j)%4],-15.1+j*.5,1.1+i*1,-13.2); // GM bookshelf
+cyl(2,2,.06,"#ffd36b",-17,.2,-5,scene,20);                                                               // GM rug
+box(1.8,1.2,1.2,"#e8ecf5",21,.75,-7);box(1.4,.2,.9,"#2d3047",21,1.45,-7);                                 // marketing printer
+// lounge
+box(1.6,2.4,1.2,"#4b5068",-21.2,1.35,4.5);box(1.2,.5,.2,mat("#ff7a59",{emissive:0xff7a59,emissiveIntensity:.4}),-20.55,2,4.5).rotation.y=Math.PI/2;cyl(.18,.15,.35,"#fff",-20.4,.6,4.5); // coffee machine
+box(1.4,1.1,1,"#8ad0ff",-21.2,.7,6.6);cyl(.35,.35,.7,"#bfe6ff",-21.2,1.6,6.6);                           // water cooler
+box(5,.8,1.6,"#ff8a7a",-16,.55,12.6);box(5,1.3,.5,"#ff8a7a",-16,1.2,13.4);box(.5,1.1,1.6,"#e86c5b",-18.7,.8,12.6);box(.5,1.1,1.6,"#e86c5b",-13.3,.8,12.6); // sofa
+cyl(2.6,2.6,.06,"#ffd36b",-16,.2,8,scene,24);cyl(.9,.9,.12,"#fff",-16,.9,8,scene,12);cyl(.12,.12,.7,"#2d3047",-16,.5,8);   // rug + table
+box(1,.8,.6,"#5fa8ff",-10.9,.6,12.8);cyl(.3,.25,.45,"#ffd36b",-10.9,1.25,12.8);cyl(.03,.03,1.6,"#a0703f",-10.6,1.6,12.6);  // Ollie's cleaning cart
+// front office: reception sign, waiting bench, doormat
+box(3.2,.7,.08,"#2d3047",-5,1.55,10.4);box(2.4,.6,1,"#ffb3a0",-8.6,.5,12.8);box(2.4,.9,.25,"#ffb3a0",-8.6,1,13.3);box(2.4,.05,1.4,"#a0703f",-5,.18,13.3);
+// creative studio: green screen + camera, easel
+box(3.4,3,.1,"#3fbf7f",2.6,2.3,2.25);for(const a of[0,2.1,4.2]){const l=cyl(.04,.04,1.7,"#2d3047",1.4+Math.sin(a)*.35,.8,4.6+Math.cos(a)*.35);l.rotation.set(Math.cos(a)*.2,0,-Math.sin(a)*.2)}
+box(.7,.45,.45,"#2d3047",1.4,1.75,4.6);cyl(.16,.16,.35,"#5fa8ff",1.4,1.75,4.25).rotation.x=Math.PI/2;
+box(.1,2.2,.1,"#a0703f",12.6,1.2,12);box(.1,2.2,.1,"#a0703f",13.4,1.2,12);box(1.4,1,.06,"#fff",13,1.8,11.85);box(.5,.35,.07,"#ff6fa3",12.8,1.9,11.8);box(.3,.25,.07,"#5fa8ff",13.3,1.6,11.8);
+// dev office: server rack
+box(1,2.6,1.4,"#2d3047",29.2,1.45,3.4);for(let i=0;i<4;i++)box(.05,.08,.9,mat("#3fbf7f",{emissive:0x3fbf7f,emissiveIntensity:.8}),28.68,.6+i*.5,3.4);
+// archive room (back right)
+{const G=new THREE.Group();scene.add(G);box(8,.32,12,tiles("#d9c7a7","#cbb795",[4,6]),26,.01,-8,G);
+ for(const x of[23.5,26,28.5]){box(2.2,3.2,.9,"#a0703f",x,1.75,-13.4,G);for(let i=0;i<3;i++)for(let j=0;j<4;j++)box(.45,.7,.5,["#ff7a59","#5fa8ff","#ffd36b","#3fbf7f","#b28cff"][(i+j+x|0)%5],x-.8+j*.53,.8+i*1,-12.95,G)}
+ for(const z of[-10.5,-9.1])for(let i=0;i<3;i++){box(1,.55,1.2,"#8d99ae",29.3,.45+i*.58,z,G);box(.05,.08,.5,"#2d3047",28.78,.5+i*.58,z,G)}
+ box(2,.2,1.4,"#b98458",26.4,1.1,-7.5,G);for(const sx of[-1,1])for(const sz of[-1,1])box(.15,1,.15,"#2d3047",26.4+sx*.85,.55,-7.5+sz*.55,G);box(.8,.5,.6,"#e9c08f",26,1.45,-7.5,G);box(.6,.4,.5,"#ddb27f",26.9,1.4,-7.3,G);
+ tagPick(G,"archive")}
+// desks
+const SCREENS={};
+function desk(id,x,z,big,top){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);const w=big?3.6:2.8;
+ box(w,.25,1.5,top||(big?"#6e4a35":"#b98458"),0,1.15,0,g);for(const sx of[-1,1])for(const sz of[-1,1])box(.2,1,.2,"#2d3047",sx*(w/2-.2),.6,sz*.55,g);
+ box(.2,.4,.2,"#2d3047",-w/2+.6,1.45,.1,g);box(1.1,.75,.12,"#2d3047",-w/2+.6,1.9,.1,g).rotation.y=.6;
+ const scr=box(.95,.6,.04,mat("#262833",{emissive:0x000000}),-w/2+.64,1.9,.17,g);scr.rotation.y=.6;SCREENS[id]=scr;
+ box(.9,.06,.35,"#e8ecf5",.35,1.3,.25,g);cyl(.13,.11,.28,P[id].t,w/2-.35,1.42,.3,g);
+ box(1.3,.2,1,"#5fa8ff",0,.75,-1.9,g);box(1.3,1.3,.2,"#5fa8ff",0,1.45,-2.45,g);cyl(.08,.08,.6,"#2d3047",0,.4,-1.9,g);tagPick(g,id);return g}
+const SEAT={boss:[-17,-9],max:[-8,-9],sam:[0,-11],mira:[6,-11],wally:[12,-11],iggy:[18,-11],wren:[0,-6],rex:[6,-6],dex:[12,-6],
+ sara:[-5,8],vito:[4,7],gigi:[10,7],momo:[18,7],webb:[24,7]};
+for(const id in SEAT){const d=desk(id,SEAT[id][0],SEAT[id][1]+1.6,id==="boss"||id==="sara",id==="sara"?"#ff7a59":null);
+ if(id==="sara"){cyl(.18,.24,.14,"#ffd36b",1.2,1.35,.3,d);cyl(.04,.04,.12,"#ffd36b",1.2,1.47,.3,d)}}
+sun.target.position.set(XC,0,0);sun.position.set(XC-14,32,20);Object.assign(sun.shadow.camera,{left:-XW/2-8,right:XW/2+8});sun.shadow.camera.updateProjectionMatrix();
+const SLOTXY={mkt:[[18,-6]],cre:[[4,11],[10,11]],dev:[[18,11],[24,11]]};
+for(const a of TEAM.agents){const r=RM.find(r=>r.id===a.office);if(!r)continue;
+ const xy=SLOTXY[a.office]?.[a.slot]||[r.x0+3+(a.slot%2)*6,r.b?(a.slot<2?-11:-6):(a.slot<2?7:11)];
+ SEAT[a.id]=xy;desk(a.id,xy[0],xy[1]+1.6)}
+const HOME=[-11.6,10.6],ARCH=[24.7,-7.5],TABLE=[-16,8];
+const CAFE={};WORK.forEach((id,i)=>{const a=i/WORK.length*Math.PI*2+.3;CAFE[id]=[TABLE[0]+Math.cos(a)*3.9,TABLE[1]+Math.sin(a)*3.2]});
+
+/* ================= CREATURES ================= */
+const ACC={
+ boss(A,h,g){box(1.05,.7,.04,"#2d3047",0,.6,.555,h);box(.08,.5,.08,"#9aa7c7",0,1.35,0,h);const bl=new THREE.Mesh(new THREE.SphereGeometry(.15,8,6),mat("#ff5a5a",{emissive:0xff2a2a,emissiveIntensity:.6}));bl.position.set(0,1.65,0);h.add(bl);A.blink=bl;
+  for(const x of[-.7,.7])box(.12,.4,.4,"#7f8bab",x,.6,0,h);box(.18,.35,.04,"#ff7a59",0,1.25,.4,g);A.eyes.forEach(e=>e.position.z=.58)},
+ sam(A,h,g){for(const x of[-.4,.4]){const e=cone(.3,.55,"#ff8a3d",x,1.35,0,h);e.rotation.y=Math.PI/4}
+  box(.55,.32,.2,"#fff3e6",0,.3,.62,h);box(.14,.1,.06,"#1d1f2e",0,.42,.73,h);const t=box(.32,.32,.9,"#ff8a3d",0,.8,-.7,g);t.rotation.x=-.6;box(.33,.33,.25,"#fff",0,1.1,-1.05,g).rotation.x=-.6;
+  for(const x of[-.28,.28])box(.42,.32,.03,mat("#bfe6ff",{transparent:true,opacity:.5}),x,.62,.6,h);box(.15,.04,.03,"#2d3047",0,.66,.6,h)},
+ mira(A,h,g){for(const x of[-.32,.32]){box(.28,1.1,.2,"#fff0f6",x,1.6,0,h);box(.14,.8,.06,"#ffb3cf",x,1.55,.1,h)}box(.22,.14,.06,"#ff86b0",0,.42,.58,h);box(.38,.38,.38,"#fff",0,.9,-.48,g)},
+ wally(A,h){for(const x of[-.34,.34]){box(.42,.42,.42,"#7fe07a",x,1.2,.25,h);box(.3,.3,.06,"#fff",x,1.22,.48,h)}A.eyes.forEach(e=>{e.position.y=1.2;e.position.z=.52;e.scale.set(.8,.8,1)});
+  box(.8,.07,.04,"#2d3047",0,.32,.56,h);box(1.5,.1,.14,"#2d3047",0,1.2,-.1,h);for(const x of[-.7,.7])box(.14,.36,.36,"#2d3047",x,.62,0,h);box(.06,.06,.5,"#2d3047",-.66,.35,.4,h)},
+ iggy(A,h){for(const x of[-.5,.5]){const e=cyl(.24,.24,.12,"#2d3047",x,1.18,0,h,10);e.rotation.x=Math.PI/2}for(const x of[-.28,.28])box(.34,.42,.03,"#2d3047",x,.6,.555,h);
+  A.eyes.forEach(e=>{e.material=mat("#fff");e.scale.set(.6,.6,1);e.position.z=.58});box(.2,.12,.05,"#2d3047",0,.36,.57,h);
+  const bw=new THREE.Group();bw.position.set(.42,1.25,.3);h.add(bw);box(.22,.2,.1,"#ff6fa3",-.15,0,0,bw);box(.22,.2,.1,"#ff6fa3",.15,0,0,bw);box(.1,.12,.12,"#ff3f86",0,0,0,bw)},
+ sara(A,h,g){for(const x of[-.42,.42])cone(.17,.45,"#7a4f33",x,1.32,0,h).rotation.z=x>0?-.35:.35;
+  for(const x of[-.28,.28])box(.42,.42,.03,"#f3dfc6",x,.62,.552,h);box(.2,.2,.18,"#ffb02e",0,.4,.62,h);
+  for(let i=0;i<5;i++)box(.1,.1,.1,"#fff",-.3+i*.15,1.4-Math.abs(i-2)*.05,.37,g);box(.36,.5,.05,"#fff",0,-.75,.24,A.arms[0])},
+ max(A,h){box(1.8,1.6,.5,"#b5651d",0,.62,-.38,h);for(const x of[-.45,.45])box(.26,.26,.15,"#ecbb5c",x,1.22,.05,h);
+  box(.55,.32,.16,"#fff1d6",0,.36,.6,h);box(.18,.12,.06,"#2d3047",0,.48,.68,h);box(.5,.65,.05,"#c98b4a",0,-.75,.24,A.arms[0]);box(.4,.5,.02,"#fff",0,-.75,.27,A.arms[0])},
+ ollie(A,h){for(const x of[-.62,.62])box(.22,.24,.14,"#d98a4a",x,1.05,0,h);box(1.36,.28,1.16,"#5fa8ff",0,1.26,0,h);box(1,.08,.5,"#5fa8ff",0,1.13,.75,h);box(.16,.12,.04,"#fff",0,.3,.57,h);
+  cyl(.05,.05,2,"#a0703f",0,-.35,.3,A.arms[0]);box(.55,.32,.22,"#ffd36b",0,-1.35,.3,A.arms[0])},
+ wren(A,h){box(.28,.16,.22,"#ff9a2e",0,.42,.62,h);box(.1,.35,.1,"#ffc400",0,1.3,0,h);box(.1,.28,.1,"#ffc400",.13,1.26,0,h).rotation.z=-.4;cyl(.05,.05,.7,"#ffb02e",0,-.75,.22,A.arms[0])},
+ rex(A,h){for(const x of[-.74,.74])box(.22,.75,.5,"#8a5a3c",x,.45,0,h);box(.52,.32,.28,"#fbe9d4",0,.36,.64,h);box(.2,.13,.08,"#1d1f2e",0,.48,.8,h);
+  cyl(.05,.05,.45,"#a0703f",0,-.7,.25,A.arms[0]);const r=cyl(.28,.28,.05,"#2d3047",0,-1.1,.25,A.arms[0],16);r.rotation.x=Math.PI/2;const gl=cyl(.22,.22,.06,mat("#bfe6ff",{transparent:true,opacity:.7}),0,-1.1,.25,A.arms[0],16);gl.rotation.x=Math.PI/2},
+ dex(A,h,g){box(1.34,.32,.04,"#2d3047",0,.62,.553,h);A.eyes.forEach(e=>e.material=mat("#fff"));for(const x of[-.42,.42])box(.3,.32,.15,"#5d606b",x,1.22,0,h);box(.16,.1,.05,"#2d3047",0,.4,.57,h);
+  const tg=new THREE.Group();tg.position.set(0,.75,-.4);tg.rotation.x=-.7;g.add(tg);for(let i=0;i<4;i++)box(.34,.34,.26,i%2?"#2d3047":"#c3c5cc",0,0,-.13-i*.26,tg)},
+ vito(A,h){box(.95,.75,.04,"#f0d2b0",0,.5,.552,h);box(1.5,.12,.16,"#ff4d6d",0,1.2,0,h);for(const x of[-.72,.72])box(.18,.42,.42,"#ff4d6d",x,.62,0,h);
+  box(.55,.4,.05,"#2d3047",0,-.82,.24,A.arms[0]);box(.55,.1,.06,"#fff",0,-.58,.24,A.arms[0])},
+ gigi(A,h){cone(.14,.6,"#ffd36b",0,1.42,.2,h,6);["#ff9fd0","#b28cff","#7fd4ff","#9be38f"].forEach((c,i)=>box(.3,.3,.3,c,0,1.1-i*.26,-.62,h));for(const x of[-.4,.4])box(.18,.3,.12,"#ffe0f4",x,1.22,0,h);
+  cyl(.04,.04,.7,"#a0703f",0,-.75,.22,A.arms[0]);box(.1,.18,.1,"#ff6fa3",0,-1.15,.22,A.arms[0])},
+ momo(A,h){for(const x of[-.68,.68]){box(.55,.55,.22,"#bcc2cc",x,1.08,0,h);box(.32,.32,.04,"#f5c6d6",x,1.08,.12,h)}box(.3,.38,.12,"#3a3f4b",0,.42,.6,h);
+  box(.3,.5,.06,"#2d3047",0,-.78,.24,A.arms[0]);box(.24,.4,.02,mat("#7fd4ff",{emissive:0x3fa8ff,emissiveIntensity:.5}),0,-.78,.28,A.arms[0])},
+ webb(A,h){box(1,.72,.04,"#fff",0,.52,.552,h);box(.3,.14,.24,"#ffa62b",0,.4,.64,h);box(1.36,.36,1.16,"#ff7a59",0,1.2,0,h);box(.26,.26,.26,"#fff",0,1.5,0,h)}};
+const STYLES={plain:"Plain",sam:"🦊 Fox",mira:"🐰 Bunny",wally:"🐸 Frog + headset",iggy:"🐼 Panda",sara:"🦉 Owl",max:"🦁 Lion",ollie:"🐹 Hamster",wren:"🐤 Chick",rex:"🐶 Dog",dex:"🦝 Raccoon",vito:"🐵 Monkey",gigi:"🦄 Unicorn",momo:"🐨 Koala",webb:"🐧 Penguin",boss:"🤖 Robot"};
+const HATS={none:"None",cap:"🧢 Cap",beanie:"🧶 Beanie",crown:"👑 Crown",tophat:"🎩 Top hat",headphones:"🎧 Headphones",bow:"🎀 Bow"};
+const HOLDS={none:"Nothing",laptop:"💻 Laptop",phone:"📱 Phone",clipboard:"📋 Clipboard",brush:"🖌️ Brush",pencil:"✏️ Pencil",megaphone:"📣 Megaphone",camera:"📷 Camera"};
+function extras(A,h,p){const c=p.t||"#5fa8ff",a=A.arms[0];
+ ({cap(){box(1.36,.28,1.16,c,0,1.26,0,h);box(1,.08,.5,c,0,1.13,.75,h)},beanie(){box(1.36,.36,1.16,c,0,1.2,0,h);box(.26,.26,.26,"#fff",0,1.5,0,h)},
+  crown(){box(1,.3,.9,"#ffd36b",0,1.28,0,h);for(const x of[-.35,0,.35])cone(.12,.3,"#ffd36b",x,1.55,.3,h)},tophat(){box(1.2,.08,1.1,"#2d3047",0,1.16,0,h);box(.75,.7,.7,"#2d3047",0,1.52,0,h);box(.77,.12,.72,c,0,1.25,0,h)},
+  headphones(){box(1.5,.12,.16,c,0,1.2,0,h);for(const x of[-.72,.72])box(.18,.42,.42,c,x,.62,0,h)},bow(){box(.26,.22,.12,c,-.17,1.2,.35,h);box(.26,.22,.12,c,.17,1.2,.35,h);box(.12,.14,.14,"#ff3f86",0,1.2,.35,h)}})[p.hat]?.();
+ ({laptop(){box(.7,.05,.5,"#c3c8d4",0,-.72,.32,a);box(.7,.45,.04,"#2d3047",0,-.5,.08,a)},phone(){box(.3,.5,.06,"#2d3047",0,-.78,.24,a);box(.24,.4,.02,mat("#7fd4ff",{emissive:0x3fa8ff,emissiveIntensity:.5}),0,-.78,.28,a)},
+  clipboard(){box(.5,.65,.05,"#c98b4a",0,-.75,.24,a);box(.4,.5,.02,"#fff",0,-.75,.27,a)},brush(){cyl(.04,.04,.7,"#a0703f",0,-.75,.22,a);box(.1,.18,.1,c,0,-1.15,.22,a)},
+  pencil(){cyl(.05,.05,.7,"#ffb02e",0,-.75,.22,a)},megaphone(){const m=cone(.25,.6,c,0,-.8,.35,a,8);m.rotation.x=-Math.PI/2},camera(){box(.5,.35,.3,"#2d3047",0,-.8,.25,a);cyl(.12,.12,.2,"#5fa8ff",0,-.8,.45,a).rotation.x=Math.PI/2}})[p.hold]?.()}
+function creature(k,p=P[k],parent=scene,pickable=true){
+ const [cb,ch,cbelly]=p.c,limb=p.limb||cb,g=new THREE.Group(),A={g,k};
+ const leg=x=>{const q=new THREE.Group();q.position.set(x,.62,0);g.add(q);box(.36,.6,.4,p.leg||limb,0,-.3,0,q);return q};
+ A.legs=[leg(-.24),leg(.24)];
+ A.body=box(1,.9,.7,cb,0,1.05,0,g);box(.66,.6,.06,cbelly,0,1.02,.36,g);
+ const arm=x=>{const q=new THREE.Group();q.position.set(x,1.42,0);g.add(q);box(.28,.7,.3,limb,0,-.32,0,q);return q};
+ A.arms=[arm(-.66),arm(.66)];
+ A.mug=cyl(.14,.12,.26,"#fff",0,-.72,.2,A.arms[1]);A.mug.visible=false;
+ const h=new THREE.Group();h.position.y=1.5;g.add(h);A.head=h;
+ box(1.3,1.1,1.1,ch,0,.58,0,h);
+ const eye=x=>{const e=box(.16,.24,.05,(p.style||k)==="boss"?mat("#4ff0ff",{emissive:0x4ff0ff,emissiveIntensity:.8}):"#1d1f2e",x,.62,.56,h);box(.06,.07,.02,"#fff",x+.03,.68,.59,h);return e};
+ A.eyes=[eye(-.28),eye(.28)];
+ for(const x of[-.48,.48])box(.2,.1,.03,"#ff9fb3",x,.42,.56,h);
+ ACC[p.style||(p.custom?"plain":k)]?.(A,h,g);extras(A,h,p);
+ g.scale.setScalar(p.s||1.5);parent.add(g);if(pickable)tagPick(g,k);return A}
+
+// HTML overlay labels
+const tag=(cls,txt="")=>{const d=document.createElement("div");d.className=cls;d.textContent=txt;ui.appendChild(d);return d};
+const ROOMS=[["👔 General Manager",-17,6.9,-14],["📊 Project Manager",-8,6.9,-14],["💻 Marketing team",16,6.9,-14],["🗄️ Archive ↗",26,6.9,-14,"archive"],
+ ["☕ Lounge",-16,2.7,2.3],["🛎️ Front office",-5,2.7,2.3],["🎨 Creative team",7,2.7,2.3],["👨‍💻 Dev team",22,2.7,2.3],
+ ["📋 Project board ↗",9,5.3,-13.7,"board"],["📅 Calendar ↗",-8,5.6,-13.7,"calendar"],
+ ...RM.filter(r=>r.custom).map(r=>[`${r.custom.emoji} ${r.custom.name}`,(r.x0+r.x1)/2,r.b?6.9:2.7,r.b?-14:2.3])].map(([t,x,y,z,go])=>{const el=tag("room"+(go?" go":""),t);if(go)el.onclick=()=>open_(go);return{el,v:new THREE.Vector3(x,y,z)}});
+const AG={};
+for(const id in P){const a=creature(id),s=SEAT[id]||HOME;a.pos=new THREE.Vector3(s[0],.15,s[1]);a.g.position.copy(a.pos);a.path=[];a.status="idle";a.off=Math.random()*10;
+ a.bubble=tag("bubble");a.name=tag("name",`${P[id].emo} ${P[id].name}`);a.zz=tag("zz");AG[id]=a}
+AG.boss.statusText="⚙️ click me for settings";AG.boss.bubble.textContent=AG.boss.statusText;
+
+/* ---- walking ---- */
+// every room has one door onto the corridor (z = 0); inside a room walk along its inner aisle (z = ±3)
+const V=(x,z)=>new THREE.Vector3(x,.15,z);
+const roomOf=p=>Math.abs(p.z)<2?null:RM.find(r=>p.x>=r.x0&&p.x<r.x1&&(p.z<0)===!!r.b)||null;
+const zin=r=>r.b?-3:3;
+const atSeat=p=>Object.values(SEAT).some(s=>Math.abs(s[0]-p.x)<.3&&Math.abs(s[1]-p.z)<.3);
+function legs(p,r){const pts=[];let x=p.x;if(atSeat(p)){x=p.x+1.9;pts.push(V(x,p.z))}pts.push(V(x,zin(r)));return pts}  // step around the desk first
+function route(from,d){if(from.distanceTo(d)<.3)return[];const rf=roomOf(from),rd=roomOf(d);
+ if(rf&&rf===rd&&!atSeat(from)&&!atSeat(d))return[d];
+ const out=rf?legs(from,rf):[],inn=rd?legs(d,rd).reverse():[];
+ if(rf&&rf===rd)return[...out,...inn,d];
+ const mid=[...(rf?[V(rf.door,zin(rf)),V(rf.door,0)]:[V(from.x,0)]),...(rd?[V(rd.door,0),V(rd.door,zin(rd))]:[V(d.x,0)])];
+ return[...out,...mid,...inn,d]}
+function goTo(a,dest,key){if(a.goal===key)return;a.goal=key;const d=V(...dest);a.dest=d;a.path=route(a.pos,d)}
+
+/* ---- render loop ---- */
+const clock=new THREE.Clock(),tmp=new THREE.Vector3();
+function project(v,el,dy=0){tmp.copy(v);tmp.y+=dy;tmp.project(cam);el.style.left=(tmp.x*.5+.5)*100+"%";el.style.top=(-tmp.y*.5+.5)*100+"%";el.style.display=tmp.z>1||Math.abs(tmp.x)>1.1||Math.abs(tmp.y)>1.1?"none":""}
+function loop(){const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+ for(const id in AG){const a=AG[id],g=a.g,[al,ar]=a.arms,[ll,lr]=a.legs;let walking=false;
+  if(a.path.length){walking=true;const n=a.path[0],dx=n.x-a.pos.x,dz=n.z-a.pos.z,d=Math.hypot(dx,dz),st=5*dt;
+   if(d<=st){a.pos.copy(n);a.path.shift()}else{a.pos.x+=dx/d*st;a.pos.z+=dz/d*st}
+   const want=Math.atan2(dx,dz);let diff=((want-g.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;g.rotation.y+=diff*Math.min(1,dt*12)}
+  else{const f=a.faceTo?.pos,want=f?Math.atan2(f.x-a.pos.x,f.z-a.pos.z):a.status==="coffee"?Math.atan2(TABLE[0]-a.pos.x,TABLE[1]-a.pos.z):id==="ollie"&&a.goal==="arch"?Math.PI/2:0;let diff=((want-g.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;g.rotation.y+=diff*Math.min(1,dt*6)}
+  const s=Math.sin(t*11+a.off);g.position.set(a.pos.x,a.pos.y+(walking?Math.abs(s)*.12:0),a.pos.z);g.rotation.z=0;a.head.rotation.x=0;a.head.position.y=1.5;
+  ll.rotation.x=walking?s*.7:0;lr.rotation.x=walking?-s*.7:0;
+  if(walking){al.rotation.x=-s*.7;ar.rotation.x=s*.7}
+  else if(id==="ollie"&&a.status==="working"){al.rotation.x=-.5+Math.sin(t*6)*.5;ar.rotation.x=Math.sin(t*6)*.2}   // sweeping
+  else if(a.say){al.rotation.x=-.4+Math.sin(t*7)*.35;ar.rotation.x=0;a.head.rotation.x=Math.sin(t*9)*.06}   // talking
+  else if(a.faceTo){al.rotation.x=ar.rotation.x=0;a.head.rotation.x=.08}                                  // listening
+  else if(a.status==="working"&&!a.scripted){al.rotation.x=-1.25+Math.sin(t*22)*.15;ar.rotation.x=-1.25+Math.sin(t*22+1.5)*.15;a.head.position.y=1.5+Math.sin(t*5)*.03;a.head.rotation.x=.12}
+  else if(a.status==="coffee"){al.rotation.x=0;ar.rotation.x=-1.1+Math.max(0,Math.sin(t*1.3))*-.9;a.head.rotation.x=-.05}
+  else{al.rotation.x=Math.sin(t*1.6+a.off)*.08;ar.rotation.x=-Math.sin(t*1.6+a.off)*.08;g.rotation.z=Math.sin(t*1.4+a.off)*.04}
+  if(a.say&&performance.now()>a.sayUntil){a.say=null;paint(a)}
+  a.mug.visible=a.status==="coffee"&&!walking;
+  const blink=((t+a.off)%4)<.13,sleepy=a.status==="waiting";a.eyes.forEach(e=>e.scale.y=(blink?.15:sleepy?.3:1)*(["wally","iggy"].includes(P[id].style||id)?.6:1));
+  if(a.blink)a.blink.material.emissiveIntensity=.3+Math.abs(Math.sin(t*3))*.9;
+  if(SCREENS[id]){const on=a.status==="working"&&!walking&&!a.scripted;SCREENS[id].material.emissive.setHSL(on?(t*.15+a.off)%1:0,on?.7:0,on?.45:0);SCREENS[id].material.color.set(on?0xffffff:0x262833)}
+  project(g.position,a.bubble,(P[id].s||1.5)*3.25);project(g.position,a.name,-.1);project(g.position,a.zz,4.6);
+  a.zz.textContent=a.status==="idle"&&!walking&&WORK.includes(id)&&!a.bubble.textContent?"z":""}
+ ROOMS.forEach(r=>project(r.v,r.el));R.render(scene,cam);requestAnimationFrame(loop)}
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+addEventListener("resize",resize);resize();loop();
+
+/* ---- picking + pan / zoom ---- */
+const ray=new THREE.Raycaster(),mp=new THREE.Vector2();
+function pick(e){const r=R.domElement.getBoundingClientRect();mp.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mp,cam);const h=ray.intersectObjects(pickables)[0];return h&&h.object.userData.pick}
+const zoom=f=>{dist=clamp(dist*f,18,95);placeCam()},resetView=()=>{T.set(XC,0,1);dist=Math.min(85,58*XW/52);placeCam()};
+resetView();let drag=null;const cv=R.domElement;
+cv.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,moved:false};cv.setPointerCapture(e.pointerId)});
+cv.addEventListener("pointermove",e=>{if(!drag){cv.style.cursor=pick(e)?"pointer":"grab";return}const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+ if(!drag.moved&&Math.abs(dx)+Math.abs(dy)<5)return;drag.moved=true;cv.style.cursor="grabbing";const k=dist/stage.clientWidth*1.1;
+ T.x=clamp(T.x-dx*k,-20,XMAX-2);T.z=clamp(T.z-dy*k*1.4,-13,16);drag.x=e.clientX;drag.y=e.clientY;placeCam()});
+cv.addEventListener("pointerup",e=>{if(drag&&!drag.moved){const id=pick(e);if(id)open_(id)}drag=null});
+cv.addEventListener("wheel",e=>{e.preventDefault();zoom(1+clamp(e.deltaY,-60,60)*.004)},{passive:false});
+
+/* ================= STATE ================= */
+function bubbleFor(a,rev){const n=rev.filter(t=>t.agent===a.id).length;
+ if(a.id==="sara")return a.status==="working"?"📝 sorting your request…":"🛎️ tell me what you need!";
+ if(a.id==="max")return a.status==="working"?(a.task?"🔍 "+a.task:"📊 checking every project…"):"📊 ask me what's happening";
+ if(a.id==="ollie")return a.status==="working"?"🧹 "+(a.task||"on it!"):a.status==="waiting"?"⏳ waiting…":"";
+ return a.status==="working"?"✍️ "+a.task:a.status==="waiting"?"⏳ waiting for the AI brain…":a.status==="coffee"?"☕ coffee break!":n?`📬 ${n} need review`:""}
+function paint(A){const s=A.say||A.statusText||"";if(A.bubble.textContent!==s)A.bubble.textContent=s;A.bubble.classList.toggle("say",!!A.say)}
+function sayIt(A,text,ms){A.say=text;A.sayUntil=performance.now()+(ms||clamp(1500+text.length*45,2200,4500));paint(A)}
+function spotOf(id,status){if(WORK.includes(id))return status==="coffee"?[CAFE[id],"cafe"]:[SEAT[id],"seat"];
+ if(id==="ollie")return status==="working"?[ARCH,"arch"]:[HOME,"home"];return[SEAT[id],"seat"]}
+const goHome=A=>{if(!A.scripted){const[d,k]=spotOf(A.k,A.status);goTo(A,d,k)}};
+let lastEv=null;
+async function tick(){try{S=await (await fetch("/api/state?since="+(lastEv||0))).json()}catch{return}
+ const rev=S.tasks.filter(t=>t.status==="review");$("rv").textContent=`📬 ${rev.length} to review`;
+ for(const a of S.agents){const A=AG[a.id];if(!A)continue;A.status=a.status;goHome(A);A.statusText=bubbleFor(a,rev);paint(A)}
+ AG.boss.statusText=rev.length?`📬 ${rev.length} replies need approval`:"⚙️ click me for settings";paint(AG.boss);
+ if(lastEv!==null)S.events.filter(e=>e.id>lastEv).forEach(play);lastEv=S.event_id;
+ const c={queued:0,working:0,review:0,done:0};S.tasks.forEach(t=>{const k=t.status==="waiting"?"working":t.status;if(k in c)c[k]++});
+ const bk=JSON.stringify(c);if(bk!==boardKey){boardKey=bk;drawBoard(c)}
+ const now=new Date(),days={};S.tasks.forEach(t=>{for(const ts of[t.ts,t.finished]){if(!ts)continue;const d=new Date(ts*1000);if(d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear())days[d.getDate()]=(days[d.getDate()]||0)+1}});
+ const ck=JSON.stringify(days)+now.getDate();if(ck!==calKey){calKey=ck;drawCal(days)}
+ refreshTasks();if(MK==="board")renderBoard();if(MK==="cal")renderCal()}
+
+/* ---- office life: visits (from the server) + coffee small talk ---- */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const arrive=(A,max=40000)=>new Promise(r=>{const t0=Date.now(),f=()=>A.path.length&&Date.now()-t0<max?setTimeout(f,120):r();f()});
+const LINE={};   // one walk at a time per avatar
+function play(e){if(!AG[e.from]||!AG[e.to])return;LINE[e.from]=(LINE[e.from]||Promise.resolve()).then(()=>visit(e)).catch(console.warn)}
+async function visit(e){if(Date.now()/1000-e.ts>150)return;const A=AG[e.from],B=AG[e.to];
+ A.scripted=true;A.goal="visit";const p=B.dest&&B.path.length?B.dest:B.pos,st=V(clamp(p.x+(B.k==="boss"||B.k==="sara"?2.2:1.7),-21,29.3),p.z+.3);
+ A.dest=st;A.path=route(A.pos,st);await arrive(A);
+ A.faceTo=B;B.faceTo=A;await sleep(300);
+ for(const[who,text]of e.lines){const X=who===e.from?A:B;sayIt(X,text);await sleep(X.sayUntil-performance.now()+250)}
+ A.faceTo=null;if(B.faceTo===A)B.faceTo=null;A.scripted=false;A.goal=null;goHome(A)}
+const SMALL=[["This coffee is amazing ☕","Best part of the day 😄"],["Busy day, huh? 😅","The busiest! But fun 🚀"],["Did you see the new project? 👀","Yes! Looks exciting ✨"],
+ ["I need more coffee 😴","Same here! ☕☕"],["Lunch later? 🍕","Absolutely! 😋"],["Max seems happy today 😊","Must be all the ✅ approvals!"]];
+setInterval(async()=>{const here=WORK.map(k=>AG[k]).filter(A=>A.status==="coffee"&&!A.path.length&&!A.scripted&&!A.faceTo&&roomOf(A.pos)?.id==="lounge");
+ if(here.length<2||document.hidden)return;const A=here.splice(Math.random()*here.length|0,1)[0],B=here[Math.random()*here.length|0];
+ const done=S.tasks.find(t=>t.agent===B.k&&t.status==="done"&&Date.now()/1000-(t.finished||0)<600);
+ const [l1,l2]=done&&Math.random()<.5?[`Nice job on “${done.title.slice(0,30)}”, ${P[B.k].name}! 👏`,"Thanks! Teamwork 🙌"]:SMALL[Math.random()*SMALL.length|0];
+ A.faceTo=B;B.faceTo=A;sayIt(A,l1,2600);await sleep(2700);sayIt(B,l2,2600);await sleep(2700);A.faceTo=B.faceTo=null},7000);
+async function health(){try{H=await (await fetch("/api/health")).json()}catch{return}
+ $("hb").classList.toggle("on",H.model_ready);$("he").classList.toggle("on",H.email);$("hw").classList.toggle("on",H.whatsapp);$("hi").classList.toggle("on",H.instagram);
+ const b=$("brain");if(b)b.innerHTML=brainHTML()}
+async function loadProjects(){try{PROJ=await (await fetch("/api/projects")).json()}catch{}}
+const pname=s=>PROJ.find(p=>p.slug===s)?.name||s;
+const post=(u,b,m="POST")=>fetch(u,{method:m,headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})});
+
+/* ---------- mini markdown ---------- */
+function md(s){const out=[];let code=null,table=false;
+ const inl=l=>esc(l).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+ for(const line of String(s||"").split("\n")){
+  if(line.trim().startsWith("```")){if(code!==null){out.push(`<pre>${esc(code)}</pre>`);code=null}else code="";continue}
+  if(code!==null){code+=line+"\n";continue}
+  const row=/^\s*\|.*\|\s*$/.test(line);if(table&&!row){out.push("</table>");table=false}
+  if(row){if(/^\s*\|[\s:|-]+\|\s*$/.test(line))continue;if(!table){out.push("<table>");table=true}out.push("<tr>"+line.trim().slice(1,-1).split("|").map(c=>`<td>${inl(c.trim())}</td>`).join("")+"</tr>");continue}
+  const h=line.match(/^(#{1,4})\s+(.*)/);
+  if(h)out.push(`<h${h[1].length+2}>${inl(h[2])}</h${h[1].length+2}>`);
+  else if(/^\s*([-*]|\d+\.)\s/.test(line))out.push(`<li>${inl(line.replace(/^\s*([-*]|\d+\.)\s/,""))}</li>`);
+  else if(line.trim()&&!/^<!--.*-->$/.test(line.trim()))out.push(`<p>${inl(line)}</p>`)}
+ if(code!==null)out.push(`<pre>${esc(code)}</pre>`);if(table)out.push("</table>");return out.join("")}
+
+/* ---------- drawer ---------- */
+let cur=null,tab="team",lastKey="";
+const closeD=()=>{document.body.classList.remove("open");cur=null};
+async function open_(id){if(id==="board")return openBoard();if(id==="calendar")return openCal();if(id==="archive")return openArchive();if(id==="boss")return openManager();
+ await loadProjects();if(id==="sara")return openChat("sara");if(id==="max")return openChat("max");if(id==="ollie")return openOllie();openAgent(id)}
+function show(id,html){cur=id;lastKey="";$("drawer").innerHTML=`<div class="dhead"><div class="emo">${P[id].emo}</div><div><h2>${P[id].name}</h2><div class="muted">${P[id].role}</div><div id="dstat"></div></div><button class="x" onclick="closeD()">✕</button></div>`+html;document.body.classList.add("open");refreshTasks()}
+const projSel=(id,lbl="Project")=>`<label>${lbl}</label><select id="${id}" onchange="$('${id}n').style.display=this.value==='__new'?'':'none'"><option value="">— no project —</option>${PROJ.map(p=>`<option value="${esc(p.slug)}">📁 ${esc(p.name)}</option>`).join("")}<option value="__new">➕ New project…</option></select><input id="${id}n" placeholder="New project name" style="display:none;margin-top:6px">`;
+function openAgent(id){show(id,`<div class="card"><h3>📝 Assign a task to ${P[id].name}</h3><textarea id="tx" placeholder="${esc(P[id].ph||"")}"></textarea>
+ ${id==="iggy"?`<input id="img" placeholder="Image URL (optional: publishes an IG post after approval)" style="margin-top:6px">`:""}${projSel("tp")}
+ <div class="row"><button onclick="assign('${id}')">Assign ✨</button></div><div class="muted" style="margin-top:6px">Tip: you can also just tell 🛎️ Sara and she'll pick the right person.</div></div><div class="card"><h3>📋 ${P[id].name}'s tasks</h3><div id="dtasks"></div></div>`)}
+function openChat(w){const sara=w==="sara";
+ show(w,`<div class="card"><h3>${sara?"💬 Tell Sara what you need":"💬 Ask Max about the projects"}</h3><div id="chat" class="chat"></div>
+ <textarea id="cx" placeholder="${sara?"e.g. Build a mobile app for booking our holiday packages, and plan its launch":"e.g. Which projects are blocked? What did Momo finish today?"}" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();talk('${w}')}"></textarea>
+ <div class="row"><button onclick="talk('${w}')">Send ✉️</button>${sara?"":`<button class="ghost" onclick="talk('max',\`What's happening right now? Give me a summary.\`)">📊 What's happening now?</button>`}<span class="msg" id="cmsg"></span></div></div>
+ ${sara?`<div class="card"><h3>📋 Tasks Sara assigned</h3><div id="dtasks"></div></div>`:`<div class="card"><h3>📁 Projects at a glance</h3>${PROJ.map(p=>`<div class="t"><div class="top"><span class="ttl">📁 ${esc(p.name)}</span><span class="muted">${p.tasks} tasks</span></div>${Object.entries(p.counts).map(([k,v])=>`<span class="chip">${k}: ${v}</span>`).join("")}<div class="row"><button class="ghost" data-s="${esc(p.slug)}" onclick="openCal(this.dataset.s)">📅 Calendar</button><button class="ghost" data-s="${esc(p.slug)}" onclick="openBoard(this.dataset.s,'timeline')">📊 Timeline</button><button class="ghost" data-s="${esc(p.slug)}" onclick="openArchive(this.dataset.s)">🗄️ Folder</button></div></div>`).join("")||'<div class="muted">No projects yet.</div>'}</div>`}`);
+ loadChat(w)}
+async function loadChat(w){try{renderChat(w,await (await fetch("/api/chat/"+w)).json())}catch{}}
+function renderChat(w,c){const el=$("chat");if(!el||cur!==w)return;
+ el.innerHTML=c.map(m=>`<div class="cm ${m.role==="user"?"me":""}">${m.role==="user"?esc(m.content):w==="max"?`<div class="md">${md(m.content)}</div>`:esc(m.content)}${(m.assigned||[]).length?"<br>":""}${(m.assigned||[]).map(x=>`<span class="chip">${P[x.agent]?.emo||""} ${esc(P[x.agent]?.name||x.agent)} · ${esc(x.title)}</span>`).join("")}${m.project?`<span class="chip">📁 ${esc(m.project)}</span>`:""}</div>`).join("")
+  ||`<div class="muted">${w==="sara"?"Hi! 😊 Tell me what you need. I'll hand it to the right teammate and open a project folder if needed.":"Hi! I keep an eye on every project. Ask me anything or tap “What's happening now?”"}</div>`;
+ el.scrollTop=el.scrollHeight}
+async function talk(w,preset){const tx=$("cx"),text=(preset??tx.value).trim();if(!text)return;tx.value="";
+ $("chat").insertAdjacentHTML("beforeend",`<div class="cm me">${esc(text)}</div>`);$("chat").scrollTop=1e9;$("cmsg").textContent=w==="sara"?"Sara is on it…":"Max is checking…";
+ try{const r=await post("/api/"+(w==="sara"?"secretary":"pm"),{text});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.statusText)}
+ catch(e){if($("cmsg"))$("cmsg").textContent="⚠️ "+String(e.message).slice(0,160);return}
+ if($("cmsg"))$("cmsg").textContent="";await loadProjects();loadChat(w);tick()}
+function openOllie(){show("ollie",`<div class="card"><h3>🧹 Quick chores</h3><label>Which project?</label><select id="op"><option value="">All projects</option>${PROJ.map(p=>`<option value="${esc(p.slug)}">📁 ${esc(p.name)}</option>`).join("")}</select>
+ <div class="row"><button onclick="chore('clean')">🧹 Clean junk files</button><button onclick="chore('readme')">📝 Refresh READMEs</button><button onclick="chore('tidy')">🗂️ Tidy the board</button></div><div class="msg out" id="omsg"></div>
+ <div class="muted" style="margin-top:6px">Clean removes only junk (.DS_Store, __pycache__, *.pyc, tool caches). Tidy moves finished tasks off the board; they stay in the timeline and README.</div></div>
+ <div class="card"><h3>📝 Something else</h3><textarea id="tx" placeholder="e.g. Write a folder structure + checklist to organise the booking app project"></textarea>${projSel("tp")}<div class="row"><button onclick="assign('ollie')">Give to Ollie ✨</button></div></div>
+ <div class="card"><h3>📋 Ollie's log</h3><div id="dtasks"></div></div>`)}
+async function chore(a,slug){const m=$("omsg");if(m)m.textContent="Ollie is on it…";const r=await (await post("/api/officeboy",{action:a,project:slug??$("op")?.value})).json();if(m)m.textContent=r.output||r.detail||"";tick();return r}
+function taskHTML(t){const rv=t.status==="review";
+ return `<div class="t"><div class="top"><span class="ttl">${P[t.agent]?.i||""} ${esc(t.title)}</span><span class="st ${t.status}">${t.status}</span></div>
+ ${t.project?`<span class="chip" style="cursor:pointer" data-s="${esc(t.project)}" onclick="openArchive(this.dataset.s)">📁 ${esc(pname(t.project))}</span>`:""}${(t.files||[]).slice(0,6).map(f=>`<span class="chip">📄 ${esc(f)}</span>`).join("")}${(t.files||[]).length>6?`<span class="chip">+${t.files.length-6} files</span>`:""}
+ ${rv?`<textarea id="e${t.id}" oninput="edits[${t.id}]=this.value">${esc(edits[t.id]??t.output)}</textarea><div class="row"><button onclick="act(${t.id},'approve')">Approve & send</button><button class="ghost" onclick="act(${t.id},'reject')">Reject</button></div>`
+ :t.output?`<div class="out">${esc(t.output)}</div>`:t.status==="queued"?`<div class="muted">waiting in ${P[t.agent].name}'s inbox…</div>`:""}</div>`}
+function refreshTasks(){if(!cur)return;
+ const a=S.agents.find(a=>a.id===cur),ds=$("dstat");
+ if(ds&&a)ds.innerHTML=`<span class="st ${a.status}">${a.status}</span> <span class="muted">· ${a.done} done${a.task?" · now: "+esc(a.task):""}</span>`;
+ else if(ds&&cur==="boss")ds.innerHTML=`<span class="muted">${S.agents.filter(a=>a.status==="working").length} working · ${S.agents.filter(a=>a.status==="coffee").length} on coffee</span>`;
+ const tm=$("team");if(tm)tm.innerHTML=S.agents.map(a=>`<span>${P[a.id]?.i||""} <b>${a.name}</b> <span class="muted">${a.role}</span></span><span class="st ${a.status}">${a.status}</span><span class="muted">${a.done} done · ${S.tasks.filter(t=>t.agent===a.id&&t.status==="queued").length} queued</span>`).join("");
+ const box=$("dtasks");if(!box||document.activeElement?.id?.startsWith("e"))return;
+ const list=cur==="boss"?S.tasks.filter(t=>t.status==="review"):cur==="sara"?S.tasks.filter(t=>t.meta?.via==="sara"):S.tasks.filter(t=>t.agent===cur);
+ const key=JSON.stringify(list.map(t=>[t.id,t.status,t.output.length]));if(key===lastKey)return;lastKey=key;
+ box.innerHTML=list.map(taskHTML).join("")||`<div class="muted">${cur==="boss"?"Nothing to approve 🎉":"No tasks yet"}</div>`}
+async function assign(id){const text=$("tx").value.trim();if(!text)return;const sel=$("tp")?.value||"";
+ await post("/api/tasks",{agent:id,text,image_url:$("img")?.value.trim()||undefined,project:sel==="__new"?"":sel,new_project:sel==="__new"?$("tpn").value.trim()||text.slice(0,40):undefined});
+ $("tx").value="";await loadProjects();tick()}
+async function act(id,a){await post(`/api/tasks/${id}/${a}`,{text:edits[id]});delete edits[id];lastKey="";tick()}
+
+/* ---------- big modal: board + archive ---------- */
+let MK=null,BV="kanban",BP="",BKEY="",BTS=0,ASEL=null;
+function modal(k,title,ctl=""){MK=k;$("mt").textContent=title;$("mx").innerHTML=ctl;$("modal").classList.add("on")}
+const closeM=()=>{$("modal").classList.remove("on");MK=null};
+addEventListener("keydown",e=>{if(e.key==="Escape"){if(MK)closeM();else closeD()}});
+const when=ts=>ts?new Date(ts*1000).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+const ago=ts=>{const s=Date.now()/1000-ts;return s<60?"just now":s<3600?`${s/60|0}m ago`:s<86400?`${s/3600|0}h ago`:`${s/86400|0}d ago`};
+async function openBoard(p,view){if(p!==undefined)BP=p;if(view)BV=view;closeD();BKEY="";modal("board","📋 Project board");await renderBoard()}
+async function renderBoard(){let d;try{d=await (await fetch("/api/board")).json()}catch{return}if(MK!=="board")return;
+ const key=JSON.stringify([d.tasks.map(t=>[t.id,t.status,t.hidden]),d.projects.length,BV,BP]);
+ const changed=key!==BKEY;if(!changed&&(BV!=="timeline"||Date.now()-BTS<10000))return;BKEY=key;BTS=Date.now();
+ const nameOf=s=>d.projects.find(p=>p.slug===s)?.name||s;
+ if(changed)$("mx").innerHTML=`<select onchange="BP=this.value;renderBoard()"><option value="">All projects</option><option value="__none" ${BP==="__none"?"selected":""}>📌 No project</option>${d.projects.map(p=>`<option value="${esc(p.slug)}" ${p.slug===BP?"selected":""}>📁 ${esc(p.name)}</option>`).join("")}</select>
+  <div class="tabs"><button class="${BV==="kanban"?"on":""}" onclick="BV='kanban';renderBoard()">🗂️ Kanban</button><button class="${BV==="timeline"?"on":""}" onclick="BV='timeline';renderBoard()">📅 Timeline</button></div>`;
+ const all=d.tasks.filter(t=>!BP||(BP==="__none"?!t.project:t.project===BP));
+ if(BV==="kanban"){const cols=[["📥 To do",["queued"]],["✍️ In progress",["waiting","working"]],["📬 Needs approval",["review"]],["✅ Done",["done"]],["⚠️ Problems",["error","rejected"]]];
+  $("mb").innerHTML=`<div class="kan">${cols.map(([l,st])=>{const ts=all.filter(t=>!t.hidden&&st.includes(t.status));return `<div class="col"><h4>${l} <span class="muted">${ts.length}</span></h4>${ts.map(t=>`<div class="kc" style="--c:${P[t.agent]?.t||"#999"}">
+   <b>${P[t.agent]?.emo||""} ${esc(P[t.agent]?.name||t.agent)}</b> <span class="muted">· ${ago(t.ts)}</span><div style="margin-top:3px">${esc(t.title)}</div>
+   ${t.project?`<span class="chip">📁 ${esc(nameOf(t.project))}</span>`:""}${t.revision?`<span class="chip">🔁 revision ${t.revision}</span>`:""}
+   ${t.review?`<span class="chip" title="${esc(t.review.feedback)}">${t.review.approved?"✅ Max approved"+(t.review.score?" "+t.review.score+"/10":""):"🔧 Max asked for fixes"}</span>`:""}${t.status==="review"?`<div class="row"><button data-a="${t.agent}" onclick="closeM();open_(this.dataset.a)">Review</button></div>`:""}
+   ${t.output?`<details><summary class="muted">result</summary><div class="out">${esc(t.output)}</div></details>`:""}</div>`).join("")||'<div class="muted" style="padding:4px">—</div>'}</div>`}).join("")}</div>`;return}
+ // timeline
+ if(!all.length){$("mb").innerHTML='<div class="muted">No tasks yet. Tell 🛎️ Sara what to build!</div>';return}
+ const now=Date.now()/1000,t0=Math.min(...all.map(t=>t.ts)),t1=Math.max(now,...all.map(t=>t.finished||0)),span=Math.max(t1-t0,60);
+ const groups={};all.slice().sort((a,b)=>a.id-b.id).forEach(t=>(groups[t.project||""]??=[]).push(t));
+ const axis=`<div class="tlr"><div></div><div class="axis">${[0,1,2,3,4].map(i=>`<span>${when(t0+span*i/4)}</span>`).join("")}</div></div>`;
+ $("mb").innerHTML=Object.entries(groups).map(([slug,ts])=>{const st=Math.min(...ts.map(t=>t.ts)),last=Math.max(...ts.map(t=>t.finished||t.started||t.ts)),done=ts.filter(t=>["done","rejected"].includes(t.status)).length;
+  return `<div class="tl"><h4>${slug?"📁 "+esc(nameOf(slug)):"📌 No project"} <span class="muted">· ${done}/${ts.length} finished · started ${when(st)} · last update ${ago(last)}</span></h4>${axis}
+  ${ts.map(t=>{const end=t.finished||now,l=(t.ts-t0)/span*100,w=Math.max((end-t.ts)/span*100,.8);
+   return `<div class="tlr"><div class="tll" title="${esc(t.title)}">${P[t.agent]?.emo||""} ${esc(t.title)}</div><div class="lane"><div class="bar ${t.finished?"":"open"}" style="--c:${P[t.agent]?.t||"#999"};left:${Math.min(l,99)}%;width:${Math.min(w,100-l)}%" title="${esc(P[t.agent]?.name)} · ${t.status} · ${when(t.ts)} → ${t.finished?when(t.finished):"now"}">${esc(P[t.agent]?.name||"")} · ${t.status}</div></div></div>`}).join("")}</div>`}).join("")}
+async function openArchive(slug){closeD();modal("archive","🗄️ Archive · project folders");await loadProjects();ASEL=slug||(PROJ.some(p=>p.slug===ASEL)?ASEL:PROJ[0]?.slug);renderArchive()}
+function renderArchive(){$("mb").innerHTML=`<div class="arch"><div>
+  <div class="card"><h3>➕ New project folder</h3><input id="npn" placeholder="Project name"><input id="npu" placeholder="URL (optional)" style="margin-top:6px"><textarea id="npd" placeholder="Short description (optional)" style="margin-top:6px;min-height:44px"></textarea><div class="row"><button onclick="newProject()">Create</button><span class="msg" id="npm"></span></div></div>
+  ${PROJ.map(p=>`<div class="card pf ${p.slug===ASEL?"on":""}" data-s="${esc(p.slug)}" onclick="ASEL=this.dataset.s;renderArchive()"><div style="font-size:30px">📁</div><div style="min-width:0"><b>${esc(p.name)}</b>
+   <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.path)}">${esc(p.path)}</div><div class="muted">${p.tasks} tasks${p.url?" · 🔗 "+esc(p.url):""}</div></div></div>`).join("")||'<div class="muted">No projects yet. Ask 🛎️ Sara to build something!</div>'}
+ </div><div id="adet"></div></div>`;if(ASEL)loadProject(ASEL)}
+const safeUrl=u=>/^https?:\/\//i.test(u)?u:"https://"+u,kb=n=>n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(1)+" MB";
+const ficon=p=>/\.(md|txt)$/.test(p)?"📝":/\.(svg|png|jpe?g|gif|webp)$/.test(p)?"🖼️":/\.(mp4|mov|webm)$/.test(p)?"🎬":/\.(json|ya?ml|toml)$/.test(p)?"⚙️":"📄";
+async function loadProject(slug){const r=await fetch("/api/projects/"+encodeURIComponent(slug));if(!r.ok||MK!=="archive")return;const d=await r.json();
+ $("adet").innerHTML=`<div class="card"><h3>📁 ${esc(d.name)}</h3><div class="muted">${esc(d.description||"")}</div>
+ <label>Folder path</label><div class="row" style="margin-top:0"><code style="flex:1;padding:6px 8px">${esc(d.path)}</code><button class="ghost" data-p="${esc(d.path)}" onclick="navigator.clipboard.writeText(this.dataset.p);this.textContent='✓ Copied'">📋 Copy</button><button class="ghost" onclick="post('/api/projects/'+encodeURIComponent(ASEL)+'/reveal')">📂 Open folder</button></div>
+ <label>URL</label><div class="row" style="margin-top:0"><input id="purl" value="${esc(d.url)}" placeholder="https://…" style="flex:1;width:auto"><button class="ghost" onclick="saveUrl(this)">💾 Save</button>${d.url?`<a href="${esc(safeUrl(d.url))}" target="_blank" rel="noopener"><button class="ghost">🔗 Open</button></a>`:""}</div>
+ <div class="row"><span class="chip">${d.tasks} tasks</span>${Object.entries(d.counts).map(([k,v])=>`<span class="chip">${k}: ${v}</span>`).join("")}</div>
+ <div class="row"><button class="ghost" onclick="openCal(ASEL)">📅 Calendar</button><button class="ghost" onclick="openBoard(ASEL,'timeline')">📊 Timeline</button><button class="ghost" onclick="chore('clean',ASEL).then(()=>loadProject(ASEL))">🧹 Ollie: clean</button><button class="ghost" onclick="chore('readme',ASEL).then(()=>loadProject(ASEL))">📝 Refresh README</button></div></div>
+ <div class="card"><h3>📖 README.md</h3><div class="md">${md(d.readme||"_No README yet_")}</div></div>
+ <div class="card"><h3>🗂️ Files (${d.files.length})</h3><div class="files">${d.files.map(f=>`<div data-f="${esc(f.path)}" onclick="viewFile(this.dataset.f)">${ficon(f.path)} ${esc(f.path)} <span class="muted">${kb(f.size)}</span></div>`).join("")}</div><div id="fview"></div></div>`}
+async function viewFile(path){const r=await fetch(`/api/projects/${encodeURIComponent(ASEL)}/file?path=${encodeURIComponent(path)}`);const d=await r.json(),v=$("fview");
+ v.innerHTML=`<h4 style="margin:12px 0 6px">${ficon(path)} ${esc(path)}</h4>`+(d.binary?'<div class="muted">Binary file. Use 📂 Open folder to view it.</div>':/\.md$/.test(path)?`<div class="md">${md(d.content)}</div>`:`<pre class="code">${esc(d.content)}</pre>`)+(d.truncated?'<div class="muted">…truncated</div>':"");v.scrollIntoView({behavior:"smooth",block:"nearest"})}
+async function saveUrl(b){await post("/api/projects/"+encodeURIComponent(ASEL),{url:$("purl").value.trim()},"PATCH");b.textContent="✓ Saved";await loadProjects();loadProject(ASEL)}
+async function newProject(){const name=$("npn").value.trim();if(!name){$("npm").textContent="Name required";return}
+ const r=await post("/api/projects",{name,url:$("npu").value.trim(),description:$("npd").value.trim()});if(!r.ok){$("npm").textContent="Could not create";return}
+ ASEL=(await r.json()).slug;await loadProjects();renderArchive()}
+
+/* ---------- calendar: month view + project progress ---------- */
+let CM=null,CP="",CSEL=null,CKEY="";
+const PAL=["#ff7a59","#5fa8ff","#3fbf7f","#b28cff","#ffb02e","#ff6fa3","#2fb8b0","#8d6e63"];
+const pcol=s=>s?PAL[[...s].reduce((h,c)=>h*31+c.charCodeAt(0)>>>0,7)%PAL.length]:"#9aa7c7";
+const dkey=d=>`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+async function openCal(p){if(p!==undefined)CP=p;closeD();const n=new Date();CM=CM||new Date(n.getFullYear(),n.getMonth(),1);CSEL=CSEL||dkey(n);CKEY="";modal("cal","📅 Calendar");await renderCal(true)}
+function calNav(k){const n=new Date();CM=k===0?new Date(n.getFullYear(),n.getMonth(),1):new Date(CM.getFullYear(),CM.getMonth()+k,1);if(k===0)CSEL=dkey(n);renderCal(true)}
+async function renderCal(force){let d;try{d=await (await fetch("/api/board")).json()}catch{return}if(MK!=="cal")return;
+ const key=JSON.stringify([d.tasks.map(t=>[t.id,t.status,t.review?.approved]),CP,CSEL,+CM]);if(!force&&key===CKEY)return;CKEY=key;
+ const nameOf=s=>d.projects.find(p=>p.slug===s)?.name||s,now=Date.now()/1000;
+ const tasks=d.tasks.filter(t=>!CP||(CP==="__none"?!t.project:t.project===CP));
+ const projs=(CP&&CP!=="__none"?d.projects.filter(p=>p.slug===CP):CP==="__none"?[]:d.projects).map(p=>{const ts=d.tasks.filter(t=>t.project===p.slug);
+  const open=ts.some(t=>["queued","waiting","working","review"].includes(t.status)),done=ts.filter(t=>["done","rejected"].includes(t.status)).length;
+  return{...p,ts,done,open,start:ts.length?Math.min(...ts.map(t=>t.ts)):null,end:open?now:ts.length?Math.max(...ts.map(t=>t.finished||t.ts)):null}}).filter(p=>p.start);
+ $("mx").innerHTML=`<select onchange="CP=this.value;renderCal(true)"><option value="">All projects</option><option value="__none" ${CP==="__none"?"selected":""}>📌 No project</option>${d.projects.map(p=>`<option value="${esc(p.slug)}" ${p.slug===CP?"selected":""}>📁 ${esc(p.name)}</option>`).join("")}</select>
+  <button class="ghost" onclick="calNav(-1)">◀</button><b style="min-width:130px;text-align:center">${CM.toLocaleString([],{month:"long",year:"numeric"})}</b><button class="ghost" onclick="calNav(1)">▶</button><button class="ghost" onclick="calNav(0)">Today</button>`;
+ const prog=projs.map(p=>{const pct=Math.round(p.done/p.ts.length*100);return `<div class="card" style="--c:${pcol(p.slug)}" data-s="${esc(p.slug)}" onclick="CP=this.dataset.s;renderCal(true)">
+  <b>📁 ${esc(p.name)}</b><div class="muted">${p.done}/${p.ts.length} tasks · ${p.open?"🟢 in progress":"✅ complete"} · ${when(p.start).split(",")[0]} → ${p.open?"now":when(p.end).split(",")[0]}</div><div class="prog"><i style="width:${pct}%"></i></div></div>`}).join("");
+ const first=new Date(CM),off=(first.getDay()+6)%7,start=new Date(first.getFullYear(),first.getMonth(),1-off),today=dkey(new Date());
+ const cells=[];for(let i=0;i<42;i++){const day=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i),a=day/1000,b=a+86400,k=dkey(day);
+  const ps=projs.filter(p=>p.start<b&&p.end>=a),ts=tasks.filter(t=>t.ts<b&&(t.finished||now)>=a);
+  cells.push(`<div class="cd ${day.getMonth()!==CM.getMonth()?"out":""} ${k===today?"today":""} ${k===CSEL?"sel":""}" onclick="CSEL='${k}';renderCal(true)"><b>${day.getDate()}</b>
+   ${ps.map(p=>`<div class="pstrip" style="--c:${pcol(p.slug)}" title="${esc(p.name)}"></div>`).join("")}
+   ${ts.slice(0,3).map(t=>`<div class="tchip" style="--c:${pcol(t.project)}" title="${esc(t.title)}">${P[t.agent]?.emo||""} ${esc(t.title)}</div>`).join("")}${ts.length>3?`<div class="muted">+${ts.length-3} more</div>`:""}</div>`)}
+ const [y,m,dd]=CSEL.split("-").map(Number),sa=new Date(y,m,dd)/1000,sb=sa+86400,sel=tasks.filter(t=>t.ts<sb&&(t.finished||now)>=sa).sort((a,b)=>a.ts-b.ts);
+ const agenda=sel.map(t=>{const ev=[t.ts>=sa&&t.ts<sb&&`📥 assigned ${when(t.ts).split(", ")[1]||""}`,t.started>=sa&&t.started<sb&&`✍️ started ${when(t.started).split(", ")[1]||""}`,t.finished>=sa&&t.finished<sb&&`🏁 finished ${when(t.finished).split(", ")[1]||""}`].filter(Boolean);
+  return `<div class="t" style="border-left:6px solid ${pcol(t.project)}"><div class="top"><span class="ttl">${P[t.agent]?.emo||""} <b>${esc(P[t.agent]?.name||t.agent)}</b> · ${esc(t.title)}</span><span class="st ${t.status}">${t.status}</span></div>
+  ${t.project?`<span class="chip">📁 ${esc(nameOf(t.project))}</span>`:""}${ev.map(x=>`<span class="chip">${x}</span>`).join("")}${t.review?`<span class="chip" title="${esc(t.review.feedback)}">${t.review.approved?"✅ approved":"🔧 fixes requested"}</span>`:""}</div>`}).join("");
+ $("mb").innerHTML=`${prog?`<div class="pgrid">${prog}</div>`:""}<div class="calw"><div class="cal">${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(w=>`<div class="wd">${w}</div>`).join("")}${cells.join("")}</div></div>
+  <div class="card" style="margin-top:12px"><h3>🗓️ ${new Date(y,m,dd).toLocaleDateString([],{weekday:"long",month:"long",day:"numeric"})} · ${sel.length} task(s)</h3>${agenda||'<div class="muted">Nothing on this day.</div>'}</div>`}
+
+/* ---------- offices & people (custom agents with the same avatar system) ---------- */
+const ROOMNAME={gm:"👔 General Manager",pm:"📊 Project Manager",mkt:"💻 Marketing team",arch:"🗄️ Archive",lounge:"☕ Lounge",front:"🛎️ Front office",cre:"🎨 Creative team",dev:"👨‍💻 Dev team"};
+const rname=r=>r.custom?`${r.custom.emoji} ${r.custom.name}`:ROOMNAME[r.id];
+const BUILTIN_IN={gm:["boss"],pm:["max"],mkt:["sam","mira","wally","iggy","wren","rex","dex"],front:["sara"],cre:["vito","gigi"],dev:["momo","webb"],lounge:["ollie"]};
+const capOf=r=>r.custom?4:(SLOTXY[r.id]||[]).length,usedIn=(r,skip)=>TEAM.agents.filter(a=>a.office===r.id&&a.id!==skip).length;
+let AFEDIT=null;
+const brainSel=(id,cur,attr="")=>`<select ${attr} style="width:auto"><option value="">Default brain</option>${Object.entries(PROV).map(([k,v])=>`<option value="${k}" ${cur===k?"selected":""}>${PICON[k]} ${esc(v)}</option>`).join("")}</select>`;
+const opts=(o,cur)=>Object.entries(o).map(([k,v])=>`<option value="${k}" ${cur===k?"selected":""}>${esc(v)}</option>`).join("");
+function officeHTML(){const e=AFEDIT&&TEAM.agents.find(a=>a.id===AFEDIT),v=e||{colors:["#8ad0ff","#a8dcff","#ffffff"],tone:"#5fa8ff",style:"plain",hat:"none",hold:"laptop",scale:1.5,emoji:"🙂",item:"⭐"};
+ const offices=RM.filter(r=>capOf(r)&&(usedIn(r,AFEDIT)<capOf(r)));
+ return `<div class="card"><h3>🏢 Offices</h3>${RM.map(r=>`<div class="t"><div class="top"><span class="ttl">${rname(r)}</span><span class="muted">${[...(BUILTIN_IN[r.id]||[]),...TEAM.agents.filter(a=>a.office===r.id).map(a=>a.id)].map(k=>P[k]?.emo).join(" ")}${capOf(r)?` · ${capOf(r)-usedIn(r)} free desk(s)`:""}</span></div>
+   ${r.custom?`<div class="row"><button class="ghost" data-o="${r.id}" onclick="delOffice(this.dataset.o,this)">🗑️ Remove office</button><span class="msg"></span></div>`:""}</div>`).join("")}
+  <h3 style="margin-top:14px">➕ Build a new office</h3><input id="on" placeholder="Office name, e.g. Sales team"><div class="row"><input id="oe" value="🏢" style="width:70px" title="Emoji"><span class="muted">Floor colour</span><input id="oc" type="color" value="#cfe8ff" style="width:56px;padding:2px">
+  <button onclick="newOffice(this)">🏗️ Build</button><span class="msg"></span></div><div class="muted">New offices are added at the east end of the building, each with 4 desks.</div></div>
+ <div class="card"><h3>🧑‍🤝‍🧑 People & their AI brain</h3>${Object.keys(P).filter(k=>k!=="boss").map(k=>`<div class="t"><div class="top"><span class="ttl">${P[k].emo} <b>${esc(P[k].name)}</b> <span class="muted">${esc(P[k].role.split(" · ")[0])}</span></span>
+   ${brainSel(k,TEAM.brains[k],`onchange="setBrain('${k}',this.value,this)"`)}</div>${P[k].custom?`<div class="row"><button class="ghost" onclick="editAgent('${k}')">✏️ Edit</button><button class="ghost" onclick="delAgent('${k}',this)">🗑️ Remove</button><span class="msg"></span></div>`:""}</div>`).join("")}</div>
+ <div class="card" id="af"><h3>${e?"✏️ Edit "+esc(e.name):"➕ Hire a new team member"}</h3>
+  <div style="display:grid;grid-template-columns:1fr 220px;gap:12px;align-items:start"><div>
+   <label>Name</label><input id="an" value="${esc(v.name||"")}" placeholder="e.g. Layla"><label>Job title</label><input id="ar" value="${esc(v.role||"")}" placeholder="e.g. Sales Agent">
+   <div class="row"><input id="ae" value="${esc(v.emoji)}" style="width:70px" title="Avatar emoji"><input id="ai" value="${esc(v.item)}" style="width:70px" title="Task icon"><span class="muted">emoji · task icon</span></div>
+   <label>Office</label><select id="ao">${offices.map(r=>`<option value="${r.id}" ${v.office===r.id?"selected":""}>${rname(r)} (${capOf(r)-usedIn(r,AFEDIT)} free)</option>`).join("")||'<option value="">No free desks: build an office first</option>'}</select>
+  </div><div><div id="pv" style="width:220px;height:220px;border:3px solid var(--ink);border-radius:14px;overflow:hidden;box-shadow:0 4px 0 var(--ink)"></div><div class="muted" style="text-align:center">live preview</div></div></div>
+  <label>Look</label><div class="row" style="margin-top:0"><select id="as" style="width:auto">${opts(STYLES,v.style)}</select><select id="ah" style="width:auto">${opts(HATS,v.hat)}</select><select id="ad" style="width:auto">${opts(HOLDS,v.hold)}</select></div>
+  <div class="row"><span class="muted">Body</span><input id="c0" type="color" value="${v.colors[0]}" style="width:46px;padding:2px"><span class="muted">Head</span><input id="c1" type="color" value="${v.colors[1]}" style="width:46px;padding:2px">
+   <span class="muted">Belly</span><input id="c2" type="color" value="${v.colors[2]}" style="width:46px;padding:2px"><span class="muted">Accent</span><input id="c3" type="color" value="${v.tone}" style="width:46px;padding:2px"></div>
+  <label>Size</label><input id="az" type="range" min="1.2" max="1.7" step=".05" value="${v.scale}">
+  <label>What they do (personality and instructions)</label><textarea id="ap" placeholder="e.g. You handle sales leads: qualify them, write follow-up messages and quotes. Be persuasive but honest.">${esc(v.prompt||"")}</textarea>
+  <label><input type="checkbox" id="af2" ${v.files?"checked":""} style="width:auto"> Writes real files (code, SVG, documents) into project folders</label>
+  <label>AI brain</label>${brainSel("",e?TEAM.brains[e.id]:"",'id="ab"')}
+  <div class="row"><button onclick="saveAgent(this)">${e?"💾 Save changes":"🎉 Hire"}</button>${e?`<button class="ghost" onclick="AFEDIT=null;openManager('office')">Cancel</button>`:""}<span class="msg"></span></div></div>`}
+function formSpec(){const g=id=>$(id)?.value;return{name:g("an"),c:[g("c0"),g("c1"),g("c2")],t:g("c3"),s:+g("az"),style:g("as"),hat:g("ah"),hold:g("ad"),custom:true,limb:g("as")==="iggy"?"#2d3047":undefined}}
+let PV=null;
+function preview(){const box_=$("pv");if(!box_)return;
+ if(!PV){const sc=new THREE.Scene();sc.background=new THREE.Color(0xeef3fb);sc.add(new THREE.HemisphereLight(0xffffff,0x9c8f84,.8));const dl=new THREE.DirectionalLight(0xffffff,.6);dl.position.set(3,6,5);sc.add(dl);
+  const c2=new THREE.PerspectiveCamera(30,1,.1,50);c2.position.set(0,3.6,10);c2.lookAt(0,2.3,0);const r=new THREE.WebGLRenderer({antialias:true});r.setPixelRatio(Math.min(devicePixelRatio,2));r.setSize(220,220);PV={sc,c2,r,g:null}}
+ if(PV.r.domElement.parentNode!==box_){box_.innerHTML="";box_.appendChild(PV.r.domElement)}
+ if(PV.g)PV.sc.remove(PV.g);PV.g=creature("preview",formSpec(),PV.sc,false).g;
+ $("af").querySelectorAll("input,select").forEach(i=>i.oninput=i.onchange=preview)}
+(function pvLoop(){if(PV&&$("pv")&&PV.g){PV.g.rotation.y+=.012;PV.r.render(PV.sc,PV.c2)}requestAnimationFrame(pvLoop)})();
+const reloadTo=w=>{location.hash="open="+encodeURIComponent(w);location.reload()};
+async function newOffice(btn){const name=$("on").value.trim(),m=btn.nextElementSibling;if(!name){m.textContent="Name required";return}
+ const c=$("oc").value,shade=c.replace(/[0-9a-f]{2}/gi,h=>Math.max(0,parseInt(h,16)-14).toString(16).padStart(2,"0"));
+ const r=await post("/api/offices",{name,emoji:$("oe").value.trim(),colors:[c,shade]});if(!r.ok){m.textContent=(await r.json()).detail;return}reloadTo("office")}
+async function delOffice(id,btn){if(!confirm("Remove this office?"))return;const r=await fetch("/api/offices/"+id,{method:"DELETE"});if(!r.ok){btn.nextElementSibling.textContent=(await r.json()).detail;return}reloadTo("office")}
+async function setBrain(id,prov,sel){await post("/api/brains",{agent:id,provider:prov},"PUT");TEAM.brains[id]=prov||undefined;sel.style.borderColor="var(--ok)"}
+function editAgent(id){AFEDIT=id;openManager("office");setTimeout(()=>$("af")?.scrollIntoView({behavior:"smooth"}),50)}
+async function delAgent(id,btn){if(!confirm(`Remove ${P[id].name} from the team? Their finished work stays in the projects.`))return;const r=await fetch("/api/agents/"+id,{method:"DELETE"});
+ if(!r.ok){btn.parentElement.querySelector(".msg").textContent=(await r.json()).detail;return}reloadTo("office")}
+async function saveAgent(btn){const m=btn.parentElement.querySelector(".msg"),sp=formSpec(),g=id=>$(id).value;
+ const body={name:g("an").trim(),role:g("ar").trim(),emoji:g("ae").trim()||"🙂",item:g("ai").trim()||"⭐",tone:sp.t,colors:sp.c,style:sp.style,hat:sp.hat,hold:sp.hold,scale:sp.s,
+  prompt:g("ap").trim(),files:$("af2").checked,office:g("ao"),provider:g("ab")};
+ if(!body.name||!body.role){m.textContent="Name and job title are required";return}if(!body.office){m.textContent="Build an office with free desks first";return}
+ const r=await post(AFEDIT?"/api/agents/"+AFEDIT:"/api/agents",body,AFEDIT?"PATCH":"POST");const d=await r.json();if(!r.ok){m.textContent="⚠️ "+d.detail;return}reloadTo(d.id)}
+
+/* ---------- manager / settings ---------- */
+let CFG={};
+const f=(k,lbl,type="text",ph="")=>`<label>${lbl}</label>${type==="area"?`<textarea data-k="${k}" placeholder="${ph}">${esc(CFG[k])}</textarea>`:`<input data-k="${k}" type="${type}" value="${esc(CFG[k])}" placeholder="${ph}">`}`;
+const brainHTML=()=>`<b>${esc(H.provider_label||"AI")}:</b> ${H.reachable?"🟢 connected":"🔴 not connected"} · <b>Model:</b> ${esc(H.model||"")} ${H.model_ready?"🟢":"🔴 not found"}
+ ${H.error?`<div class="muted">⚠️ ${esc(H.error)}</div>`:""}${H.pull?.status?`<div class="muted">Download: ${esc(H.pull.status)} ${H.pull.pct?H.pull.pct+"%":""}</div>`:""}`;
+const PROV=TEAM.providers,PICON={ollama:"🦙",openai:"🟢",anthropic:"🟠",gemini:"🔷",deepseek:"🐋",qwen:"🟣"};
+const KEYHINT={ollama:"ollama.com/settings/keys",openai:"platform.openai.com/api-keys",anthropic:"console.anthropic.com → API keys",gemini:"aistudio.google.com/apikey",deepseek:"platform.deepseek.com/api_keys",qwen:"Alibaba Cloud Model Studio → API keys"};
+const provCard=p=>{const U=p.toUpperCase(),on=(CFG.LLM_PROVIDER||"ollama")===p;
+ return `<div class="card" style="${on?"border-color:var(--accent)":""}"><h3>${PICON[p]} ${esc(PROV[p])}${on?' <span class="chip">default brain</span>':""}</h3>
+ ${p==="ollama"?f("OLLAMA_URL","Ollama URL","text","https://ollama.com (cloud) or http://localhost:11434"):""}${p==="qwen"?f("QWEN_URL","Endpoint (region)","text","https://dashscope-intl.aliyuncs.com/compatible-mode/v1"):""}
+ ${f(U+"_API_KEY","API key"+(p==="ollama"?" (cloud only)":""),"password","get one at "+KEYHINT[p])}
+ <label>Model</label><input data-k="${U}_MODEL" list="ml-${p}" value="${esc(CFG[U+"_MODEL"])}"><datalist id="ml-${p}"></datalist>
+ <div class="row"><button class="ghost" onclick="loadModels('${p}',this)">🔄 Load models</button><button class="ghost" onclick="test('llm-${p}',this)">Test</button><span class="msg"></span></div>
+ ${p==="ollama"?`<div class="row"><button class="ghost" onclick="save().then(()=>post('/api/pull')).then(health)">⬇️ Download model (local only)</button></div>`:""}</div>`};
+async function loadModels(p,btn){const m=btn.parentElement.querySelector(".msg");m.textContent="Loading…";await save();
+ const r=await (await fetch("/api/models?provider="+p)).json();$("ml-"+p).innerHTML=r.models.map(x=>`<option value="${esc(x)}">`).join("");
+ m.textContent=r.ok?`${r.models.length} models found. Click the model box to pick one`:"⚠️ "+r.msg}
+async function openManager(t){closeM();tab=t||tab;CFG=await (await fetch("/api/settings")).json();const T={team:"👥 Team",office:"🏢 Offices & people",brain:"🧠 AI brains",connections:"🔌 Connections",prompts:"🎭 Personalities"};
+ const body={
+ office:officeHTML(),
+ team:`<div class="card"><h3>👥 Team status</h3><div class="stat" id="team"></div></div><div class="card"><h3>📬 Waiting for your approval</h3><div id="dtasks"></div></div>`,
+ brain:`<div class="card"><h3>🧠 Default AI brain</h3><div id="brain" class="msg">${brainHTML()}</div>
+  <label>Everyone uses this brain unless you give a person their own (🏢 Offices & people tab)</label>
+  <select data-k="LLM_PROVIDER">${Object.entries(PROV).map(([k,v])=>`<option value="${k}" ${(CFG.LLM_PROVIDER||"ollama")===k?"selected":""}>${PICON[k]} ${esc(v)}</option>`).join("")}</select>
+  ${f("PARALLEL","AI calls at the same time (restart to apply)","number")}</div>
+  ${Object.keys(PROV).map(provCard).join("")}
+  <div class="card"><h3>🏷️ Brand & workflow</h3>${f("BRAND_PROFILE","Brand profile (who you are, tone, offers)","area")}
+  <label><input type="checkbox" id="auto" ${CFG.AUTO_SEND==="true"?"checked":""} style="width:auto"> Auto-send replies without my approval</label>
+  <label><input type="checkbox" id="pmr" ${CFG.PM_REVIEW!=="false"?"checked":""} style="width:auto"> Max reviews finished project work and sends it back once for fixes if needed</label>
+  ${f("COFFEE_SECONDS","Coffee break after each task (seconds)","number")}${f("PROJECTS_DIR","Projects folder (the Archive)")}</div>`,
+ connections:`<div class="card"><h3>✉️ Email</h3>${f("IMAP_HOST","IMAP host","text","imap.gmail.com")}${f("IMAP_USER","IMAP user")}${f("IMAP_PASS","IMAP password / app password","password")}
+  ${f("SMTP_HOST","SMTP host","text","smtp.gmail.com")}${f("SMTP_PORT","SMTP port")}${f("SMTP_USER","SMTP user")}${f("SMTP_PASS","SMTP password","password")}${f("EMAIL_POLL_SECONDS","Check inbox every (seconds)","number")}
+  <div class="row"><button class="ghost" onclick="test('email',this)">Test</button><span class="msg"></span></div></div>
+  <div class="card"><h3>💬 WhatsApp Cloud API</h3>${f("WA_PHONE_ID","Phone number ID")}${f("WA_TOKEN","Access token","password")}<div class="row"><button class="ghost" onclick="test('whatsapp',this)">Test</button><span class="msg"></span></div></div>
+  <div class="card"><h3>📸 Instagram Graph API</h3>${f("IG_USER_ID","Instagram business account ID")}${f("IG_TOKEN","Access token","password")}<div class="row"><button class="ghost" onclick="test('instagram',this)">Test</button><span class="msg"></span></div></div>
+  <div class="card"><h3>🔗 Meta webhook</h3><div class="muted">Callback URL: <code>https://&lt;your-public-host&gt;/webhook</code><br>Subscribe WhatsApp <i>messages</i>, Instagram <i>messages</i> + <i>comments</i>.</div>${f("WEBHOOK_VERIFY_TOKEN","Verify token")}</div>`,
+ prompts:`<div class="card"><h3>🎭 Employee personalities</h3>${Object.keys(P).filter(k=>k!=="boss"&&!P[k].custom).map(k=>f("PROMPT_"+k,`${P[k].i} ${P[k].name} · ${P[k].role.split(" · ")[0]}`,"area")).join("")}</div>`};
+ show("boss",`<div class="tabs">${Object.entries(T).map(([k,v])=>`<button class="${k===tab?"on":""}" onclick="openManager('${k}')">${v}</button>`).join("")}</div>${body[tab]}
+  ${tab!=="team"&&tab!=="office"?`<div class="row"><button onclick="save(this)">💾 Save settings</button><span class="msg" id="saved"></span></div>`:""}`);if(tab==="office")preview()}
+async function save(btn){const d={};document.querySelectorAll("#drawer [data-k]").forEach(i=>d[i.dataset.k]=i.value);if($("auto"))d.AUTO_SEND=$("auto").checked?"true":"false";if($("pmr"))d.PM_REVIEW=$("pmr").checked?"true":"false";
+ await post("/api/settings",d);if($("saved"))$("saved").textContent="Saved ✓";health()}
+async function test(w,btn){await save();btn.nextElementSibling.textContent="Testing…";const r=await (await post("/api/test/"+w)).json();btn.nextElementSibling.textContent=r.msg}
+
+tick();health();loadProjects();setInterval(tick,1200);setInterval(health,6000);
+{const h=location.hash.match(/^#open=(.+)/);if(h){history.replaceState(null,"",location.pathname);const w=decodeURIComponent(h[1]);setTimeout(()=>w==="office"?openManager("office"):open_(w),500)}}
+</script></body></html>
