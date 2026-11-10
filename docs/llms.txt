@@ -1,0 +1,15 @@
+# Tiny Office
+
+> Tiny Office is a self-hosted, open-source multi-agent AI application that runs a virtual digital agency as a 3D office. An AI secretary (Sara) routes plain-language requests to specialist AI agents (web developer, mobile app developer, graphic designer, content writer, SEO specialist, ads specialist, video editor, email/WhatsApp/Instagram support). An AI project manager (Max) briefs agents, reviews their work with a score and requests one revision when needed. Agents write real files into per-project folders. Built with Python (FastAPI) and three.js; works with Ollama (local or cloud), OpenAI ChatGPT, Anthropic Claude, Google Gemini, DeepSeek and Alibaba Qwen, selectable per agent.
+
+## Docs
+- [README](README.md): features, quick start, configuration, REST API, FAQ
+- [Environment variables](.env.example): every setting with defaults
+
+## Key facts
+- Run: `pip install -r requirements.txt && uvicorn app:app --port 8000`, open http://localhost:8000
+- Storage: JSON files (data.json, settings.json, team.json) and a projects/ folder; no database
+- Views: 3D office, kanban board, per-project timeline, wall calendar, project archive with auto README
+- Extensible: create new offices (4 desks each) and hire custom agents with a 3D avatar, prompt, file-writing permission and AI model
+- Channels: web dashboard, email (IMAP/SMTP), WhatsApp Cloud API, Instagram Graph API, with human approval before sending by default
+- API docs: http://localhost:8000/docs (OpenAPI)

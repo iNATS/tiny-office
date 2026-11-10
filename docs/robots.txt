@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://inats.github.io/tiny-office/sitemap.xml
