@@ -10,6 +10,8 @@
 [![AI providers](https://img.shields.io/badge/AI-Ollama%20%C2%B7%20ChatGPT%20%C2%B7%20Claude%20%C2%B7%20Gemini%20%C2%B7%20DeepSeek%20%C2%B7%20Qwen-ff7a59)](#which-ai-models-does-tiny-office-support)
 [![Self-hosted](https://img.shields.io/badge/self--hosted-no%20database-2d3047)](#quick-start)
 
+**[🌐 Website](https://inats.github.io/tiny-office/) · [🚀 Quick start](#quick-start) · [❓ FAQ](#faq) · [⭐ Star this repo](https://github.com/iNATS/tiny-office/stargazers)**
+
 <img src="docs/media/tiny-office-cover.jpg" alt="Tiny Office: a 3D virtual AI agency with AI agents working at desks" width="820">
 
 https://github.com/user-attachments/assets/REPLACE-WITH-UPLOADED-VIDEO-ID
